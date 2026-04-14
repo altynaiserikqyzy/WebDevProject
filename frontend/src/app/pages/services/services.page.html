@@ -1,0 +1,155 @@
+<div class="page">
+  <div class="container">
+    <!-- Search Section -->
+    <section class="search-section">
+      <div class="search-header">
+        <h1 class="page-title">Explore Tutors</h1>
+        <p class="page-subtitle">Find the perfect tutor for your subjects</p>
+      </div>
+      <div class="search-bar">
+        <input
+          type="text"
+          [(ngModel)]="searchQuery"
+          name="searchQuery"
+          placeholder="Search by subject or tutor name..."
+          class="search-input"
+        />
+        <button class="btn-primary search-button" (click)="onSearchClick()">Search</button>
+      </div>
+    </section>
+
+    @if (error) {
+      <div class="error-message">{{ error }}</div>
+    }
+
+    <!-- Subjects Section -->
+    <section class="subjects-section">
+      <div class="section-header">
+        <h2 class="section-title">Browse by Subject</h2>
+        <button class="btn-ghost" (click)="onLoadSubjectsClick()" [disabled]="loading">
+          @if (loading) {
+            Loading...
+          } @else {
+            Load Subjects
+          }
+        </button>
+      </div>
+      <div class="subjects-grid">
+        @for (subject of subjects; track subject.id) {
+          <div class="subject-card" (click)="onSubjectClick(subject.id)">
+            <div class="subject-icon">{{ subject.icon || '📚' }}</div>
+            <div class="subject-name">{{ subject.name }}</div>
+          </div>
+        }
+      </div>
+    </section>
+
+    <!-- Tutor Services Section -->
+    <section class="services-section">
+      <div class="section-header">
+        <h2 class="section-title">Available Tutors</h2>
+        <button class="btn-ghost" (click)="onLoadServicesClick()" [disabled]="loading">
+          @if (loading) {
+            Loading...
+          } @else {
+            Load Tutors
+          }
+        </button>
+      </div>
+      <div class="services-grid">
+        @if (services.length === 0) {
+          <div class="empty-state">
+            <div class="empty-icon">👋</div>
+            <p>No tutors loaded yet. Click "Load Tutors" to explore available tutors.</p>
+          </div>
+        } @else {
+          @for (service of services; track service.id) {
+            <div class="tutor-card" (click)="onTutorCardClick(service.tutor)">
+              <div class="tutor-header">
+                <div class="tutor-avatar">
+                  @if (service.tutor_photo) {
+                    <img [src]="service.tutor_photo" alt="{{ service.tutor_username }}" />
+                  } @else {
+                    <div class="avatar-placeholder">{{ service.tutor_username.charAt(0) || '?' }}</div>
+                  }
+                </div>
+                <div class="tutor-info">
+                  <div class="tutor-name">{{ service.tutor_username }}</div>
+                  <div class="tutor-year">Year {{ service.tutor_study_year || 'N/A' }}</div>
+                </div>
+                <div class="tutor-rating">
+                  <span class="rating-stars">⭐ {{ service.tutor_rating || '0.0' }}</span>
+                </div>
+              </div>
+              <div class="service-info">
+                <h3 class="service-title">{{ service.title }}</h3>
+                <div class="service-meta">
+                  <span class="subject-badge">{{ service.subject_name }}</span>
+                  <span class="format-badge">{{ service.format }}</span>
+                </div>
+                <p class="service-description">{{ service.description || 'No description provided' }}</p>
+              </div>
+              <div class="tutor-footer">
+                <div class="price">₸{{ service.price_per_hour }}/hour</div>
+                <div class="actions" (click)="$event.stopPropagation()">
+                  <button class="btn-secondary message-btn" (click)="onMessageClick(service.id)">Message</button>
+                  <button class="btn-primary book-btn" (click)="onBookClick(service.id)">Book</button>
+                </div>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </section>
+
+    <!-- Create Service Section (for tutors) -->
+    <section class="create-section">
+      <div class="section-header">
+        <h2 class="section-title">Become a Tutor</h2>
+        <button class="btn-ghost" (click)="toggleCreateForm()">
+          @if (showCreateForm) {
+            Hide Form
+          } @else {
+            Create Service
+          }
+        </button>
+      </div>
+      @if (showCreateForm) {
+        <div class="create-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Subject</label>
+              <select [(ngModel)]="subjectId" name="subjectId" class="form-input">
+                <option [ngValue]="null">Select...</option>
+                @for (s of subjects; track s.id) {
+                  <option [ngValue]="s.id">{{ s.name }}</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Title</label>
+              <input [(ngModel)]="title" name="title" placeholder="Calculus help" class="form-input" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Description</label>
+              <input [(ngModel)]="description" name="description" placeholder="Topics, level, etc." class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Price/hour</label>
+              <input [(ngModel)]="pricePerHour" name="pricePerHour" placeholder="3000" class="form-input" />
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Format</label>
+              <input [(ngModel)]="format" name="format" placeholder="online" class="form-input" />
+            </div>
+          </div>
+          <button class="btn-primary" (click)="onCreateServiceClick()">Publish Service</button>
+        </div>
+      }
+    </section>
+  </div>
+</div>

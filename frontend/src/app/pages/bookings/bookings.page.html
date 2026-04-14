@@ -1,0 +1,59 @@
+<div class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1 class="page-title">My Calendar</h1>
+      <p class="page-subtitle">View and manage your upcoming sessions</p>
+    </div>
+
+    @if (error) {
+      <div class="error-message">{{ error }}</div>
+    }
+
+    <div class="calendar-actions">
+      <button class="btn-primary" (click)="onLoadBookingsClick()" [disabled]="loading">
+        @if (loading) {
+          Loading...
+        } @else {
+          Refresh Calendar
+        }
+      </button>
+    </div>
+
+    @if (bookings.length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">📅</div>
+        <h3>No bookings yet</h3>
+        <p>You haven't booked any tutoring sessions yet. Go to the Services page to find a tutor!</p>
+        <button class="btn-primary" routerLink="/services">Browse Tutors</button>
+      </div>
+    } @else {
+      <div class="bookings-grid">
+        @for (b of bookings; track b.id) {
+          <div class="booking-card" [style.--booking-color]="b.event_color || '#8b5cf6'">
+            <div class="booking-header">
+              <div class="booking-date">
+                <div class="date-day">{{ b.scheduled_for | date:'shortDate' }}</div>
+                <div class="date-time">{{ b.scheduled_for | date:'shortTime' }}</div>
+              </div>
+              <div class="booking-status">{{ b.status }}</div>
+            </div>
+            <div class="booking-content">
+              <h3 class="booking-title">{{ b.service_title }}</h3>
+              <div class="booking-tutor">with {{ b.tutor_username }}</div>
+              <div class="booking-details">
+                <span class="detail-item">{{ b.number_of_sessions || 1 }} session(s)</span>
+                <span class="detail-item">₸{{ b.total_price }}</span>
+              </div>
+              @if (b.notes) {
+                <div class="booking-notes">{{ b.notes }}</div>
+              }
+            </div>
+            <div class="booking-footer">
+              <button class="btn-ghost" (click)="onMessageClick(b.id)">Message Tutor</button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</div>

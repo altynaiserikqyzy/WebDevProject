@@ -1,0 +1,683 @@
+{
+  "info": {
+    "name": "NoRetake KBTU API",
+    "description": "Postman collection for NoRetake KBTU tutoring platform API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000/api",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"testpass123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login", ""]
+            },
+            "description": "Get JWT access and refresh tokens"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"testuser\",\n  \"password\": \"testpass123\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "login", ""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"access\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"refresh\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}"
+            },
+            {
+              "name": "Invalid credentials",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"username\": \"wrong\",\n  \"password\": \"wrong\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/login/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "login", ""]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Invalid credentials.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/logout/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "logout", ""]
+            },
+            "description": "Blacklist refresh token"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/auth/logout/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "logout", ""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"detail\": \"Logged out.\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Me (Current User)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/me/",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "me", ""]
+            },
+            "description": "Get current authenticated user info"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/auth/me/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["auth", "me", ""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 1,\n  \"username\": \"testuser\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Subjects",
+      "item": [
+        {
+          "name": "List Subjects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/subjects/",
+              "host": ["{{baseUrl}}"],
+              "path": ["subjects", ""]
+            },
+            "description": "List all subjects (no auth required)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/subjects/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["subjects", ""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": 1,\n    \"name\": \"Mathematics\"\n  },\n  {\n    \"id\": 2,\n    \"name\": \"Physics\"\n  },\n  {\n    \"id\": 3,\n    \"name\": \"Programming\"\n  }\n]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Services",
+      "item": [
+        {
+          "name": "List Services",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/services/",
+              "host": ["{{baseUrl}}"],
+              "path": ["services", ""]
+            },
+            "description": "List all tutoring services (no auth required)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/services/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["services", ""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": 1,\n    \"tutor\": 1,\n    \"tutor_username\": \"tutor1\",\n    \"subject\": 1,\n    \"subject_name\": \"Mathematics\",\n    \"title\": \"Calculus Help\",\n    \"description\": \"Help with derivatives and integrals\",\n    \"price_per_hour\": \"3000.00\",\n    \"format\": \"online\",\n    \"is_active\": true,\n    \"created_at\": \"2026-04-13T18:00:00Z\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Create Service",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": 1,\n  \"title\": \"Advanced Calculus\",\n  \"description\": \"Multivariable calculus help\",\n  \"price_per_hour\": \"4000.00\",\n  \"format\": \"online\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/services/",
+              "host": ["{{baseUrl}}"],
+              "path": ["services", ""]
+            },
+            "description": "Create a new tutoring service (auth required)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"subject\": 1,\n  \"title\": \"Advanced Calculus\",\n  \"description\": \"Multivariable calculus help\",\n  \"price_per_hour\": \"4000.00\",\n  \"format\": \"online\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/services/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["services", ""]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 2,\n  \"tutor\": 1,\n  \"tutor_username\": \"tutor1\",\n  \"subject\": 1,\n  \"subject_name\": \"Mathematics\",\n  \"title\": \"Advanced Calculus\",\n  \"description\": \"Multivariable calculus help\",\n  \"price_per_hour\": \"4000.00\",\n  \"format\": \"online\",\n  \"is_active\": true,\n  \"created_at\": \"2026-04-13T18:05:00Z\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Service",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/services/:id/",
+              "host": ["{{baseUrl}}"],
+              "path": ["services", ":id", ""],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Delete a service (auth required, owner only)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/services/1/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["services", "1", ""]
+                }
+              },
+              "status": "No Content",
+              "code": 204
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "List My Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bookings/",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings", ""]
+            },
+            "description": "List current user's bookings (auth required)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bookings/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["bookings", ""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": 1,\n    \"service\": 1,\n    \"service_title\": \"Calculus Help\",\n    \"student\": 2,\n    \"student_username\": \"student1\",\n    \"scheduled_for\": \"2026-04-15T14:00:00Z\",\n    \"notes\": \"Need help with integrals\",\n    \"status\": \"planned\",\n    \"created_at\": \"2026-04-13T18:10:00Z\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service\": 1,\n  \"scheduled_for\": \"2026-04-15T14:00:00Z\",\n  \"notes\": \"Need help with integrals\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/bookings/",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings", ""]
+            },
+            "description": "Create a new booking (auth required)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"service\": 1,\n  \"scheduled_for\": \"2026-04-15T14:00:00Z\",\n  \"notes\": \"Need help with integrals\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/bookings/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["bookings", ""]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 1,\n  \"service\": 1,\n  \"service_title\": \"Calculus Help\",\n  \"student\": 2,\n  \"student_username\": \"student1\",\n  \"scheduled_for\": \"2026-04-15T14:00:00Z\",\n  \"notes\": \"Need help with integrals\",\n  \"status\": \"planned\",\n  \"created_at\": \"2026-04-13T18:10:00Z\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chat Messages",
+      "item": [
+        {
+          "name": "List Messages for Booking",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/bookings/:booking_id/messages/",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings", ":booking_id", "messages", ""],
+              "variable": [
+                {
+                  "key": "booking_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "List chat messages for a specific booking (auth required)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/bookings/1/messages/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["bookings", "1", "messages", ""]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "[\n  {\n    \"id\": 1,\n    \"booking\": 1,\n    \"sender\": 2,\n    \"sender_username\": \"student1\",\n    \"text\": \"Hi, looking forward to the session!\",\n    \"created_at\": \"2026-04-13T18:15:00Z\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Create Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Hi, looking forward to the session!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/bookings/:booking_id/messages/",
+              "host": ["{{baseUrl}}"],
+              "path": ["bookings", ":booking_id", "messages", ""],
+              "variable": [
+                {
+                  "key": "booking_id",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Send a chat message for a booking (auth required)"
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{access_token}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"text\": \"Hi, looking forward to the session!\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/bookings/1/messages/",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["bookings", "1", "messages", ""]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"id\": 1,\n  \"booking\": 1,\n  \"sender\": 2,\n  \"sender_username\": \"student1\",\n  \"text\": \"Hi, looking forward to the session!\",\n  \"created_at\": \"2026-04-13T18:15:00Z\"\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

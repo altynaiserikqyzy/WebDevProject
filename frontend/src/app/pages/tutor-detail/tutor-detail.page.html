@@ -1,0 +1,166 @@
+<div class="page">
+  <div class="container">
+    @if (error) {
+      <div class="error-message">{{ error }}</div>
+    }
+
+    @if (loading) {
+      <div class="loading-state">
+        <p>Loading tutor details...</p>
+      </div>
+    } @else if (tutor) {
+      <!-- Tutor Profile Section -->
+      <section class="profile-section">
+        <div class="profile-header">
+          <div class="tutor-avatar-large">
+            @if (tutor.photo) {
+              <img [src]="tutor.photo" alt="{{ tutor.username }}" />
+            } @else {
+              <div class="avatar-placeholder-large">{{ tutor.username.charAt(0) }}</div>
+            }
+          </div>
+          <div class="profile-info">
+            <h1 class="tutor-name">{{ tutor.username }}</h1>
+            <div class="profile-meta">
+              <span class="meta-item">Year {{ tutor.study_year || 'N/A' }}</span>
+              <span class="meta-item">{{ tutor.course || 'KBTU Student' }}</span>
+            </div>
+            <div class="rating-display">
+              <span class="rating-stars">⭐ {{ tutor.rating || '0.0' }}</span>
+              <span class="review-count">({{ tutor.total_reviews || 0 }} reviews)</span>
+            </div>
+          </div>
+        </div>
+
+        @if (tutor.bio) {
+          <div class="bio-section">
+            <h2 class="section-title">About</h2>
+            <p class="bio-text">{{ tutor.bio }}</p>
+          </div>
+        }
+      </section>
+
+      <!-- Services Section -->
+      <section class="services-section">
+        <h2 class="section-title">Services Offered</h2>
+        <div class="services-list">
+          @for (service of tutor.services; track service.id) {
+            <div class="service-item" [class.selected]="selectedServiceId === service.id" (click)="onServiceSelect(service.id, service.price_per_hour)">
+              <div class="service-header">
+                <h3 class="service-title">{{ service.title }}</h3>
+                <div class="service-price">₸{{ service.price_per_hour }}/hour</div>
+              </div>
+              <div class="service-meta">
+                <span class="subject-badge">{{ service.subject_name }}</span>
+                <span class="format-badge">{{ service.format }}</span>
+              </div>
+              <p class="service-description">{{ service.description || 'No description provided' }}</p>
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- Availability Section -->
+      <section class="availability-section">
+        <h2 class="section-title">Availability</h2>
+        <div class="availability-grid">
+          @if (availability.length === 0) {
+            <p class="no-availability">No availability schedule set yet.</p>
+          } @else {
+            @for (avail of availability; track avail.id) {
+              @if (avail.is_available) {
+                <div class="availability-card">
+                  <div class="day-name">{{ getWeekdayName(avail.weekday) }}</div>
+                  <div class="time-range">{{ formatTime(avail.start_time) }} - {{ formatTime(avail.end_time) }}</div>
+                </div>
+              }
+            }
+          }
+        </div>
+      </section>
+
+      <!-- Reviews Section -->
+      <section class="reviews-section">
+        <h2 class="section-title">Student Reviews</h2>
+        @if (reviews.length === 0) {
+          <p class="no-reviews">No reviews yet.</p>
+        } @else {
+          <div class="reviews-list">
+            @for (review of reviews; track review.id) {
+              <div class="review-card">
+                <div class="review-header">
+                  <div class="reviewer-name">{{ review.reviewer_username }}</div>
+                  <div class="review-rating">⭐ {{ review.rating }}/5</div>
+                </div>
+                <p class="review-comment">{{ review.comment }}</p>
+                <div class="review-date">{{ review.created_at | date:'mediumDate' }}</div>
+              </div>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- Booking Section -->
+      <section class="booking-section">
+        <h2 class="section-title">Book a Session</h2>
+        <div class="booking-form">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Select Service</label>
+              <select [(ngModel)]="selectedServiceId" name="service" class="form-input">
+                <option [ngValue]="null">Choose a service...</option>
+                @for (service of tutor.services; track service.id) {
+                  <option [ngValue]="service.id">{{ service.title }} - ₸{{ service.price_per_hour }}/hour</option>
+                }
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Format</label>
+              <select [(ngModel)]="bookingFormat" name="format" class="form-input">
+                <option value="online">Online</option>
+                <option value="offline">Offline</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Date</label>
+              <input type="date" [(ngModel)]="bookingDate" name="date" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label>Time</label>
+              <input type="time" [(ngModel)]="bookingTime" name="time" class="form-input" />
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Number of Sessions</label>
+              <input
+                type="number"
+                [(ngModel)]="numberOfSessions"
+                name="sessions"
+                (ngModelChange)="onSessionsChange()"
+                min="1"
+                class="form-input"
+              />
+            </div>
+            <div class="form-group">
+              <label>Total Price</label>
+              <div class="total-price">₸{{ totalPrice }}</div>
+            </div>
+          </div>
+
+          <button class="btn-primary book-button" (click)="onBookClick()" [disabled]="loading">
+            @if (loading) {
+              Booking...
+            } @else {
+              Book Session
+            }
+          </button>
+        </div>
+      </section>
+    }
+  </div>
+</div>

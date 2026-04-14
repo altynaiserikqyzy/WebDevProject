@@ -1,0 +1,152 @@
+<div class="page">
+  <div class="container">
+    <div class="page-header">
+      <h1 class="page-title">My Profile</h1>
+      <button class="btn-ghost logout-button" (click)="onLogoutClick()">Logout</button>
+    </div>
+
+    @if (error) {
+      <div class="error-message">{{ error }}</div>
+    }
+
+    <!-- User Info Section -->
+    <section class="profile-section">
+      <div class="section-header">
+        <h2 class="section-title">Personal Information</h2>
+        @if (!tutorProfile) {
+          <button class="btn-primary" (click)="onBecomeTutorClick()">Become a Tutor</button>
+        } @else {
+          <button class="btn-secondary" (click)="onEditProfileClick()">Edit Profile</button>
+        }
+      </div>
+
+      <div class="user-info">
+        <div class="user-avatar">
+          <div class="avatar-placeholder">{{ user?.username?.charAt(0) || '?' }}</div>
+        </div>
+        <div class="user-details">
+          <h3 class="username">{{ user?.username }}</h3>
+          @if (tutorProfile) {
+            <div class="tutor-badge">Tutor</div>
+            <div class="rating">⭐ {{ tutorProfile.rating || '0.0' }} ({{ tutorProfile.total_reviews || 0 }} reviews)</div>
+            <div class="meta">Year {{ tutorProfile.study_year || 'N/A' }} · {{ tutorProfile.course || 'KBTU Student' }}</div>
+          } @else {
+            <div class="student-badge">Student</div>
+          }
+        </div>
+      </div>
+
+      @if (tutorProfile && tutorProfile.bio) {
+        <div class="bio-section">
+          <h4 class="bio-title">About Me</h4>
+          <p class="bio-text">{{ tutorProfile.bio }}</p>
+        </div>
+      }
+    </section>
+
+    <!-- Edit Profile Form -->
+    @if (showEditForm) {
+      <section class="form-section">
+        <div class="section-header">
+          <h2 class="section-title">Edit Profile</h2>
+          <button class="btn-ghost" (click)="onCancelClick()">Cancel</button>
+        </div>
+        <div class="edit-form">
+          <div class="form-group">
+            <label>Bio</label>
+            <textarea [(ngModel)]="bio" name="bio" class="form-input" rows="4" placeholder="Tell students about yourself..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Course</label>
+              <input [(ngModel)]="course" name="course" class="form-input" placeholder="e.g., Computer Science" />
+            </div>
+            <div class="form-group">
+              <label>Study Year</label>
+              <input [(ngModel)]="studyYear" name="studyYear" type="number" class="form-input" placeholder="1-4" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Google Meet Link (for online sessions)</label>
+            <input [(ngModel)]="googleMeetLink" name="googleMeetLink" class="form-input" placeholder="https://meet.google.com/..." />
+          </div>
+          <button class="btn-primary" (click)="onSaveProfileClick()" [disabled]="loading">
+            @if (loading) {
+              Saving...
+            } @else {
+              Save Changes
+            }
+          </button>
+        </div>
+      </section>
+    }
+
+    <!-- Become Tutor Form -->
+    @if (showTutorForm) {
+      <section class="form-section">
+        <div class="section-header">
+          <h2 class="section-title">Become a Tutor</h2>
+          <button class="btn-ghost" (click)="onCancelClick()">Cancel</button>
+        </div>
+        <div class="edit-form">
+          <div class="form-group">
+            <label>Bio</label>
+            <textarea [(ngModel)]="tutorBio" name="tutorBio" class="form-input" rows="4" placeholder="Tell students about your teaching style and expertise..."></textarea>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Course/Major</label>
+              <input [(ngModel)]="tutorCourse" name="tutorCourse" class="form-input" placeholder="e.g., Computer Science" />
+            </div>
+            <div class="form-group">
+              <label>Study Year</label>
+              <input [(ngModel)]="tutorStudyYear" name="tutorStudyYear" type="number" class="form-input" placeholder="1-4" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Google Meet Link (for online sessions)</label>
+            <input [(ngModel)]="tutorGoogleMeetLink" name="tutorGoogleMeetLink" class="form-input" placeholder="https://meet.google.com/..." />
+          </div>
+          <button class="btn-primary" (click)="onCreateTutorProfileClick()" [disabled]="loading">
+            @if (loading) {
+              Creating...
+            } @else {
+              Create Tutor Profile
+            }
+          </button>
+        </div>
+      </section>
+    }
+
+    <!-- Bookings Section -->
+    <section class="bookings-section">
+      <div class="section-header">
+        <h2 class="section-title">My Sessions</h2>
+      </div>
+
+      @if (bookings.length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">📅</div>
+          <p>No sessions booked yet.</p>
+          <button class="btn-primary" routerLink="/services">Find a Tutor</button>
+        </div>
+      } @else {
+        <div class="bookings-list">
+          @for (b of bookings; track b.id) {
+            <div class="booking-item">
+              <div class="booking-header">
+                <h3 class="booking-title">{{ b.service_title }}</h3>
+                <div class="booking-status">{{ b.status }}</div>
+              </div>
+              <div class="booking-details">
+                <div class="detail">with {{ b.tutor_username }}</div>
+                <div class="detail">{{ b.scheduled_for | date:'medium' }}</div>
+                <div class="detail">{{ b.number_of_sessions || 1 }} session(s) · ₸{{ b.total_price }}</div>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </section>
+  </div>
+</div>

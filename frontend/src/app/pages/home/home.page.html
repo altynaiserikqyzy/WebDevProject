@@ -1,0 +1,106 @@
+<div class="page">
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <h1 class="hero-title">
+          <span class="text-gradient">NoRetake KBTU</span>
+        </h1>
+        <p class="hero-subtitle">Find help from senior students and tutors in any subject</p>
+        <div class="hero-actions">
+          <button class="btn-primary" (click)="onGetStartedClick()">
+            @if (isLoggedIn) {
+              Go to Services
+            } @else {
+              Start Learning Today
+            }
+          </button>
+          <button class="btn-secondary" (click)="onExploreClick()">Explore Services</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features">
+    <div class="container">
+      <h2 class="section-title">How It Works</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">📚</div>
+          <h3>Find Tutors</h3>
+          <p>Browse services by subject and find the perfect tutor for your needs</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💬</div>
+          <h3>Chat & Communicate</h3>
+          <p>Message tutors directly to discuss details and arrange lessons</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📅</div>
+          <h3>Book Sessions</h3>
+          <p>Schedule study sessions at convenient times and track your progress</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🎓</div>
+          <h3>Become a Tutor</h3>
+          <p>Share your knowledge and earn money by tutoring other students</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="testimonials">
+    <div class="container">
+      <h2 class="section-title">What Students Say</h2>
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <div class="testimonial-content">
+            <p>"NoRetake helped me pass my calculus exam. The tutors are patient and really know the material!"</p>
+          </div>
+          <div class="testimonial-author">
+            <div class="author-avatar">AS</div>
+            <div class="author-info">
+              <div class="author-name">Ainur S.</div>
+              <div class="author-subject">Mathematics</div>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial-card">
+          <div class="testimonial-content">
+            <p>"I found an amazing physics tutor through this platform. My grades improved significantly!"</p>
+          </div>
+          <div class="testimonial-author">
+            <div class="author-avatar">DT</div>
+            <div class="author-info">
+              <div class="author-name">Daniyar T.</div>
+              <div class="author-subject">Physics</div>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial-card">
+          <div class="testimonial-content">
+            <p>"The booking system is so easy to use. I've already scheduled 5 sessions for this semester."</p>
+          </div>
+          <div class="testimonial-author">
+            <div class="author-avatar">MK</div>
+            <div class="author-info">
+              <div class="author-name">Madina K.</div>
+              <div class="author-subject">Programming</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA Section -->
+  <section class="cta">
+    <div class="container">
+      <h2 class="cta-title">Ready to improve your grades?</h2>
+      <p class="cta-subtitle">Join thousands of KBTU students who are already using NoRetake</p>
+      <button class="btn-primary cta-button" (click)="onGetStartedClick()">Start Learning Today</button>
+    </div>
+  </section>
+</div>
