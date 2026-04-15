@@ -83,3 +83,74 @@ export interface Message {
   content: string;
   time: string;
 }
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface LoginResponse {
+  access: string;
+  refresh: string;
+}
+
+export interface SignupRequest {
+  fullName: string;
+  username: string;
+  email: string;
+  password: string;
+}
+
+export interface AuthUser {
+  id: number;
+  fullName: string;
+  username: string;
+  email: string;
+  bio: string;
+  major: string;
+  studyYear: number;
+  avatar: string;
+  isTutor: boolean;
+}
+
+export interface StoredUser extends AuthUser {
+  password: string;
+}
+
+export interface UserSearchResult {
+  id: number;
+  fullName: string;
+  username: string;
+  email: string;
+  avatar: string;
+}
+
+export interface LocalChatThread {
+  id: number;
+  participantIds: [number, number];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LocalChatMessage {
+  id: number;
+  threadId: number;
+  senderId: number;
+  text: string;
+  createdAt: string;
+}
+
+export interface ChatPreview {
+  id: number;
+  otherUser: UserSearchResult;
+  lastMessage: string;
+  updatedAt: string;
+}
+
+export interface ChatViewMessage {
+  id: number;
+  senderId: number;
+  text: string;
+  createdAt: string;
+  isMine: boolean;
+}

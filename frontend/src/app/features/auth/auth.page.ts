@@ -19,11 +19,15 @@ import { AuthService } from '../../core/auth.service';
           <button class="flex-1 rounded-lg py-2" [class]="tab() === 'login' ? 'bg-brand-500 text-white' : 'text-slate-300'" (click)="tab.set('login')">Login</button>
           <button class="flex-1 rounded-lg py-2" [class]="tab() === 'signup' ? 'bg-brand-500 text-white' : 'text-slate-300'" (click)="tab.set('signup')">Sign Up</button>
         </div>
+        @if (error) {
+          <p class="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{{ error }}</p>
+        }
         <form class="space-y-4" (ngSubmit)="submit()">
           @if (tab() === 'signup') {
-            <input [(ngModel)]="name" name="name" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Full name" required />
+            <input [(ngModel)]="fullName" name="fullName" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Full name" required />
           }
-          <input [(ngModel)]="email" name="email" type="email" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Email" required />
+          <input [(ngModel)]="username" name="username" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Username" required />
+          <input [(ngModel)]="email" name="email" type="email" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Email" [required]="tab() === 'signup'" />
           <input [(ngModel)]="password" name="password" type="password" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Password" required minlength="6" />
           <button class="btn-primary w-full">{{ tab() === 'login' ? 'Login' : 'Create Account' }}</button>
         </form>
@@ -33,18 +37,41 @@ import { AuthService } from '../../core/auth.service';
 })
 export class AuthPage {
   readonly tab = signal<'login' | 'signup'>('login');
-  name = '';
+  fullName = '';
+  username = '';
   email = '';
   password = '';
+  error = '';
 
   constructor(private readonly auth: AuthService, private readonly router: Router) {}
 
   submit() {
+    this.error = '';
+
     if (this.tab() === 'signup') {
-      this.auth.signup(this.name || 'KBTU Student', this.email);
+      const result = this.auth.signup({
+        fullName: this.fullName || 'KBTU Student',
+        username: this.username,
+        email: this.email,
+        password: this.password,
+      });
+
+      if (!result.ok) {
+        this.error = result.error;
+        return;
+      }
     } else {
-      this.auth.login(this.email);
+      const result = this.auth.login({
+        username: this.username,
+        password: this.password,
+      });
+
+      if (!result.ok) {
+        this.error = result.error;
+        return;
+      }
     }
-    this.router.navigateByUrl('/explore');
+
+    this.router.navigateByUrl('/profile');
   }
 }

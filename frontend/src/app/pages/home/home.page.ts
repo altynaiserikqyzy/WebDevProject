@@ -15,7 +15,7 @@ export class HomePage {
   isLoggedIn = false;
 
   constructor(private readonly auth: AuthService, private readonly router: Router) {
-    this.auth.isLoggedIn().subscribe((v) => (this.isLoggedIn = v));
+    this.isLoggedIn = this.auth.isLoggedIn();
   }
 
   onGetStartedClick() {
