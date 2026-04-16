@@ -27,14 +27,15 @@ export class LoginPage {
     this.error = null;
     this.loading = true;
 
-    const result = this.auth.login({ username: this.username, password: this.password });
-    this.loading = false;
-
-    if (!result.ok) {
-      this.error = result.error;
-      return;
-    }
-
-    this.router.navigateByUrl('/services');
+    this.auth.login({ username: this.username, password: this.password }, {
+      next: () => {
+        this.loading = false;
+        this.router.navigateByUrl('/services');
+      },
+      error: (message) => {
+        this.loading = false;
+        this.error = message;
+      },
+    });
   }
 }

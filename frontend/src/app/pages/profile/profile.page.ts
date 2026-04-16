@@ -44,6 +44,7 @@ export class ProfilePage {
   course = '';
   studyYear: number | null = null;
   googleMeetLink = '';
+  selectedAvatarFile: File | null = null;
 
   // Become tutor form
   showTutorForm = false;
@@ -101,15 +102,40 @@ export class ProfilePage {
     }
     this.showEditForm = true;
   }
+  onAvatarSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.selectedAvatarFile = input.files?.[0] ?? null;
+}
 
   onSaveProfileClick() {
     this.loading = true;
     this.error = '';
-    // TODO: Implement update profile API call
-    alert('Profile update feature coming soon!');
-    this.loading = false;
-    this.showEditForm = false;
-  }
+
+    const formData = new FormData();
+    formData.append('bio', this.bio);
+    formData.append('major', this.course);
+    if (this.studyYear !== null) {
+      formData.append('study_year', String(this.studyYear));
+    }
+    if (this.selectedAvatarFile) {
+      formData.append('avatar', this.selectedAvatarFile);
+    }
+
+    this.api.updateMyProfile(formData).subscribe({
+      next: () => {
+        this.loading = false;
+        this.showEditForm = false;
+        this.selectedAvatarFile = null;
+        this.loadUserProfile();
+      },
+      error: (err: any) => {
+        this.loading = false;
+        this.error = err?.error?.detail ?? 'Failed to update profile';
+      }
+  });
+}
+
+
 
   onBecomeTutorClick() {
     this.showTutorForm = true;

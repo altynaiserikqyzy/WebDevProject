@@ -3,7 +3,6 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
 import { AuthService } from '../../core/auth.service';
-import { LocalAppDataService } from '../../core/local-app-data.service';
 
 @Component({
   standalone: true,
@@ -29,7 +28,7 @@ import { LocalAppDataService } from '../../core/local-app-data.service';
         <div class="grid gap-4 md:grid-cols-3">
           <article class="glass p-4">
             <p class="text-sm text-slate-300">Registered chats</p>
-            <p class="text-2xl font-bold">{{ data.listThreads().length }}</p>
+            <p class="text-2xl font-bold">Backend</p>
           </article>
           <article class="glass p-4">
             <p class="text-sm text-slate-300">Account type</p>
@@ -55,13 +54,28 @@ import { LocalAppDataService } from '../../core/local-app-data.service';
           </article>
         }
 
-        <article class="glass p-6">
-          <h2 class="text-xl font-semibold">Become a Tutor</h2>
-          <p class="mt-1 text-slate-300">This switch is local for now, but it already becomes part of your own saved profile.</p>
-          <button class="btn-primary mt-4" [disabled]="user.isTutor" (click)="becomeTutor()">
-            {{ user.isTutor ? 'You are already a tutor' : 'Become Tutor' }}
-          </button>
-        </article>
+        @if (!user.isTutor) {
+          <article class="glass p-6">
+            <h2 class="text-xl font-semibold">Become a Tutor</h2>
+            <p class="mt-1 text-slate-300">Turn on tutor mode to publish services and appear as a tutor in the app.</p>
+            <button class="btn-primary mt-4" (click)="becomeTutor()">Become Tutor</button>
+          </article>
+        } @else {
+          <article class="glass p-6">
+            <div class="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 class="text-xl font-semibold">Tutor Settings</h2>
+                <p class="mt-1 text-slate-300">Tutor mode is active. You can keep it on and manage services later, or turn it off at any time.</p>
+              </div>
+              <span class="rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-200">Tutor mode active</span>
+            </div>
+            <div class="mt-5 flex flex-wrap gap-3">
+              <a routerLink="/profile/create-service" class="btn-primary inline-flex">Create Service</a>
+              <button class="btn-secondary" (click)="disableTutorMode()">Disable Tutor Mode</button>
+            </div>
+            <p class="mt-3 text-sm text-slate-400">When tutor mode is turned off, your tutor-only actions should stop and your services can be hidden.</p>
+          </article>
+        }
 
         <article class="glass p-6">
           <h2 class="text-xl font-semibold">Start chatting</h2>
@@ -81,9 +95,12 @@ export class ProfilePage {
   avatar = '';
 
   constructor(
-    public readonly auth: AuthService,
-    public readonly data: LocalAppDataService
-  ) {}
+    public readonly auth: AuthService
+  ) {
+    if (!this.auth.user()) {
+      this.auth.loadProfile();
+    }
+  }
 
   toggleEdit() {
     this.editing = !this.editing;
@@ -98,17 +115,18 @@ export class ProfilePage {
       bio: this.bio,
       major: this.major,
       studyYear: Number(this.studyYear) || 1,
+      avatar: this.avatar.trim(),
+    }, () => {
+      this.editing = false;
     });
-
-    if (this.avatar.trim()) {
-      this.data.updateProfile({ avatar: this.avatar.trim() });
-    }
-
-    this.editing = false;
   }
 
   becomeTutor() {
     this.auth.becomeTutor();
+  }
+
+  disableTutorMode() {
+    this.auth.setTutorStatus(false);
   }
 
   private fillForm() {

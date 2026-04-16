@@ -106,6 +106,18 @@ export class LocalAppDataService {
     this.persistUsers();
   }
 
+  setTutorStatus(isTutor: boolean) {
+    const currentUserId = this.currentUserIdState();
+    if (!currentUserId) {
+      return;
+    }
+
+    this.usersState.update((items) =>
+      items.map((item) => (item.id === currentUserId ? { ...item, isTutor: isTutor } : item))
+    );
+    this.persistUsers();
+  }
+
   searchUsers(query: string): UserSearchResult[] {
     const normalizedQuery = query.trim().toLowerCase();
     const currentUserId = this.currentUserIdState();

@@ -1,8 +1,8 @@
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 
+import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
-import { LocalAppDataService } from '../../core/local-app-data.service';
 import { ChatPreview, ChatViewMessage, UserSearchResult } from '../../core/models';
 
 @Component({
@@ -27,8 +27,13 @@ import { ChatPreview, ChatViewMessage, UserSearchResult } from '../../core/model
               [(ngModel)]="userSearch"
               (ngModelChange)="refreshUserSearch()"
               class="mt-3 w-full rounded-xl border border-white/20 bg-slate-900 px-3 py-2"
-              placeholder="Username, name or email"
+              placeholder="Start typing a name, username or email"
             />
+            @if (!hasUserSearch()) {
+              <p class="mt-3 rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
+                Search for a user to start a conversation.
+              </p>
+            }
             <div class="mt-3 max-h-44 space-y-2 overflow-y-auto">
               @for (user of foundUsers; track user.id) {
                 <button class="w-full rounded-xl border border-white/10 bg-slate-900/80 p-3 text-left transition hover:bg-slate-800" (click)="openChatWith(user)">
@@ -36,9 +41,11 @@ import { ChatPreview, ChatViewMessage, UserSearchResult } from '../../core/model
                   <p class="text-xs text-slate-400">@{{ user.username }} · {{ user.email }}</p>
                 </button>
               } @empty {
-                <p class="rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
-                  {{ userSearch.trim() ? 'No registered users matched your search.' : 'Create more accounts and they will appear here.' }}
-                </p>
+                @if (hasUserSearch()) {
+                  <p class="rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
+                    No users matched your search.
+                  </p>
+                }
               }
             </div>
           </div>
@@ -107,20 +114,20 @@ export class ChatPage {
   userSearch = '';
   draft = '';
   foundUsers: UserSearchResult[] = [];
+  threads: ChatPreview[] = [];
   activeThread: ChatPreview | null = null;
   activeMessages: ChatViewMessage[] = [];
 
   constructor(
     public readonly auth: AuthService,
-    private readonly data: LocalAppDataService
+    private readonly api: ApiService
   ) {
-    this.refresh();
-    this.refreshUserSearch();
+    this.loadConversations();
   }
 
   filteredThreads() {
     const query = this.threadSearch.trim().toLowerCase();
-    return this.data.listThreads().filter((thread) => {
+    return this.threads.filter((thread) => {
       if (!query) {
         return true;
       }
@@ -129,23 +136,44 @@ export class ChatPage {
   }
 
   refreshUserSearch() {
-    this.foundUsers = this.data.searchUsers(this.userSearch);
-  }
-
-  openChatWith(user: UserSearchResult) {
-    const thread = this.data.startOrOpenChat(user.id);
-    if (!thread) {
+    const query = this.userSearch.trim();
+    if (!query) {
+      this.foundUsers = [];
       return;
     }
 
-    this.activeThread = thread;
-    this.activeMessages = this.data.getThreadMessages(thread.id);
+    this.api.searchUsers(query).subscribe({
+      next: (users) => {
+        this.foundUsers = users.map((user) => ({
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          fullName: user.username,
+          avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(user.username)}`,
+        }));
+      },
+      error: () => {
+        this.foundUsers = [];
+      },
+    });
+  }
+
+  openChatWith(user: UserSearchResult) {
+    this.api.startConversation(user.id).subscribe({
+      next: (conversation) => {
+        this.activeThread = this.mapConversationToThread(conversation);
+        this.loadMessages(conversation.id);
+        this.loadConversations();
+      },
+    });
   }
 
   selectThread(threadId: number) {
-    const thread = this.data.listThreads().find((item) => item.id === threadId) ?? null;
+    const thread = this.threads.find((item) => item.id === threadId) ?? null;
     this.activeThread = thread;
-    this.activeMessages = thread ? this.data.getThreadMessages(thread.id) : [];
+    if (thread) {
+      this.loadMessages(thread.id);
+    }
   }
 
   send() {
@@ -153,27 +181,71 @@ export class ChatPage {
       return;
     }
 
-    this.data.sendMessage(this.activeThread.id, this.draft);
-    this.draft = '';
-    this.refresh();
-    this.selectThread(this.activeThread.id);
+    this.api.sendConversationMessage(this.activeThread.id, this.draft).subscribe({
+      next: () => {
+        this.draft = '';
+        this.loadMessages(this.activeThread!.id);
+        this.loadConversations();
+      },
+    });
   }
 
   formatDate(value: string) {
     return new Date(value).toLocaleString();
   }
 
-  private refresh() {
-    const threads = this.data.listThreads();
-    if (!this.activeThread && threads.length) {
-      this.selectThread(threads[0].id);
-      return;
-    }
+  hasUserSearch() {
+    return this.userSearch.trim().length > 0;
+  }
 
-    if (this.activeThread) {
-      const updatedThread = threads.find((item) => item.id === this.activeThread?.id) ?? null;
-      this.activeThread = updatedThread;
-      this.activeMessages = updatedThread ? this.data.getThreadMessages(updatedThread.id) : [];
-    }
+  private loadConversations() {
+    this.api.listConversations().subscribe({
+      next: (conversations) => {
+        this.threads = conversations.map((conversation) => this.mapConversationToThread(conversation));
+        if (!this.activeThread && this.threads.length) {
+          this.selectThread(this.threads[0].id);
+        }
+      },
+      error: () => {
+        this.threads = [];
+      },
+    });
+  }
+
+  private loadMessages(conversationId: number) {
+    this.api.getConversationMessages(conversationId).subscribe({
+      next: (messages) => {
+        const currentUserId = this.auth.user()?.id;
+        this.activeMessages = messages.map((message) => ({
+          id: message.id,
+          senderId: message.sender?.id ?? 0,
+          text: message.text,
+          createdAt: message.created_at,
+          isMine: message.sender?.id === currentUserId,
+        }));
+      },
+      error: () => {
+        this.activeMessages = [];
+      },
+    });
+  }
+
+  private mapConversationToThread(conversation: any): ChatPreview {
+    const currentUserId = this.auth.user()?.id;
+    const otherParticipant = (conversation.participants ?? []).find((participant: any) => participant.user?.id !== currentUserId);
+    const otherUser = otherParticipant?.user ?? { id: 0, username: 'Unknown', email: '' };
+
+    return {
+      id: conversation.id,
+      otherUser: {
+        id: otherUser.id,
+        username: otherUser.username,
+        email: otherUser.email,
+        fullName: otherUser.username,
+        avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(otherUser.username)}`,
+      },
+      lastMessage: conversation.last_message?.text ?? 'Start your conversation.',
+      updatedAt: conversation.updated_at,
+    };
   }
 }

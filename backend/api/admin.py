@@ -1,11 +1,10 @@
 from django.contrib import admin
 
-from .models import Booking, ChatMessage, Review, Subject, TutorAvailability, TutorProfile, TutoringService
+from .models import Conversation, ConversationParticipant, Message, Profile, Subject, TutorService
 
-admin.site.register(TutorProfile)
+admin.site.register(Profile)
 admin.site.register(Subject)
-admin.site.register(TutoringService)
-admin.site.register(Booking)
-admin.site.register(ChatMessage)
-admin.site.register(Review)
-admin.site.register(TutorAvailability)
+admin.site.register(TutorService)
+admin.site.register(Conversation)
+admin.site.register(ConversationParticipant)
+admin.site.register(Message)

@@ -2,9 +2,9 @@ import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
+import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { LessonFormat } from '../../core/models';
-import { PlatformService } from '../../core/platform.service';
 
 @Component({
   standalone: true,
@@ -30,29 +30,36 @@ import { PlatformService } from '../../core/platform.service';
   `
 })
 export class CreateServicePage {
-  subjectId = 4;
+  subjectId = 1;
   pricePerHour = 7000;
   format: LessonFormat = 'online';
   title = 'Programming mentor from KBTU';
   description = 'Exam prep, practical coding and confidence boosting sessions.';
+  error = '';
 
   constructor(
-    private readonly platform: PlatformService,
+    private readonly api: ApiService,
     private readonly auth: AuthService,
     private readonly router: Router
   ) {}
 
   publish() {
-    this.platform.addTutorService({
-      id: Date.now(),
-      subjectId: Number(this.subjectId),
+    this.error = '';
+    this.api.createService({
+      subject_id: Number(this.subjectId),
       title: this.title,
       description: this.description,
-      pricePerHour: Number(this.pricePerHour),
+      price_per_hour: String(this.pricePerHour),
       format: this.format,
-      teachingStyle: 'Interactive and student-centered.'
+    }).subscribe({
+      next: () => {
+        this.auth.becomeTutor(() => {
+          this.router.navigateByUrl('/tutors');
+        });
+      },
+      error: (err) => {
+        this.error = err?.error?.detail ?? 'Failed to create service.';
+      },
     });
-    this.auth.becomeTutor();
-    this.router.navigateByUrl('/tutors');
   }
 }

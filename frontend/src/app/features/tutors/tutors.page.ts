@@ -1,7 +1,7 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { PlatformService } from '../../core/platform.service';
+import { ApiService } from '../../core/api.service';
 
 @Component({
   standalone: true,
@@ -11,15 +11,16 @@ import { PlatformService } from '../../core/platform.service';
       <div class="glass p-5">
         <h1 class="text-3xl font-bold">Tutors Listing</h1>
         <div class="mt-4 grid gap-3 md:grid-cols-3">
-          <input class="rounded-xl border border-white/20 bg-slate-900 px-4 py-2" placeholder="Search tutor or subject" (input)="search.set(($any($event.target).value || '').toLowerCase())" />
-          <select class="rounded-xl border border-white/20 bg-slate-900 px-4 py-2" (change)="sort.set($any($event.target).value)">
-            <option value="rating">Sort by rating</option>
+          <input class="rounded-xl border border-white/20 bg-slate-900 px-4 py-2" placeholder="Search tutor or subject" (input)="onSearch(($any($event.target).value || '').toLowerCase())" />
+          <select class="rounded-xl border border-white/20 bg-slate-900 px-4 py-2" (change)="onSort($any($event.target).value)">
+            <option value="newest">Sort by newest</option>
             <option value="price">Sort by price</option>
           </select>
-          <select class="rounded-xl border border-white/20 bg-slate-900 px-4 py-2" (change)="format.set($any($event.target).value)">
-            <option value="all">All formats</option>
+          <select class="rounded-xl border border-white/20 bg-slate-900 px-4 py-2" (change)="onFormat($any($event.target).value)">
+            <option value="">All formats</option>
             <option value="online">Online</option>
             <option value="offline">Offline</option>
+            <option value="both">Both</option>
           </select>
         </div>
       </div>
@@ -30,11 +31,11 @@ import { PlatformService } from '../../core/platform.service';
               <img [src]="tutor.avatar" class="h-16 w-16 rounded-full object-cover" [alt]="tutor.name" />
               <div class="flex-1">
                 <h3 class="font-semibold">{{ tutor.name }}</h3>
-                <p class="text-sm text-slate-300">{{ tutor.service.title }}</p>
-                <p class="text-sm text-brand-200">★ {{ tutor.rating }} · {{ tutor.service.pricePerHour }} KZT/h · Year {{ tutor.studyYear }}</p>
+                <p class="text-sm text-slate-300">{{ tutor.title }}</p>
+                <p class="text-sm text-brand-200">{{ tutor.price }} KZT/h · {{ tutor.format }}</p>
               </div>
             </div>
-            <p class="mt-3 text-sm text-slate-300">{{ tutor.quote }}</p>
+            <p class="mt-3 text-sm text-slate-300">{{ tutor.description }}</p>
             <div class="mt-4 flex gap-2">
               <a routerLink="/chat" class="btn-secondary px-4 py-2 text-sm">Message</a>
               <a [routerLink]="['/tutors', tutor.id]" class="btn-primary px-4 py-2 text-sm">View Profile</a>
@@ -48,19 +49,68 @@ import { PlatformService } from '../../core/platform.service';
   `
 })
 export class TutorsPage {
-  readonly search = signal('');
-  readonly sort = signal<'rating' | 'price'>('rating');
-  readonly format = signal<'all' | 'online' | 'offline'>('all');
+  readonly tutors = signal<Array<{
+    id: number;
+    name: string;
+    title: string;
+    description: string;
+    price: string;
+    format: string;
+    avatar: string;
+    createdAt: string;
+  }>>([]);
 
-  readonly tutors = computed(() => {
-    let list = this.platform.tutors().filter((t) => `${t.name} ${t.service.title}`.toLowerCase().includes(this.search()));
-    if (this.format() !== 'all') {
-      list = list.filter((t) => t.formats.includes(this.format() as 'online' | 'offline'));
-    }
-    return [...list].sort((a, b) =>
-      this.sort() === 'rating' ? b.rating - a.rating : a.service.pricePerHour - b.service.pricePerHour
-    );
-  });
+  private search = '';
+  private format = '';
+  private sort: 'newest' | 'price' = 'newest';
 
-  constructor(private readonly platform: PlatformService) {}
+  constructor(private readonly api: ApiService) {
+    this.loadServices();
+  }
+
+  onSearch(value: string) {
+    this.search = value;
+    this.loadServices();
+  }
+
+  onFormat(value: string) {
+    this.format = value;
+    this.loadServices();
+  }
+
+  onSort(value: 'newest' | 'price') {
+    this.sort = value;
+    this.loadServices();
+  }
+
+  private loadServices() {
+    this.api.listServices({
+      search: this.search || undefined,
+      format: this.format || undefined,
+    }).subscribe({
+      next: (services) => {
+        const mapped = services.map((service) => ({
+          id: service.id,
+          name: service.tutor?.full_name ?? service.tutor?.user?.username ?? 'Tutor',
+          title: service.title,
+          description: service.description,
+          price: service.price_per_hour,
+          format: service.format,
+          avatar: service.tutor?.avatar || `https://i.pravatar.cc/160?u=${encodeURIComponent(service.tutor?.user?.username ?? service.id)}`,
+          createdAt: service.created_at,
+        }));
+
+        const sorted = [...mapped].sort((a, b) =>
+          this.sort === 'price'
+            ? Number(a.price) - Number(b.price)
+            : b.createdAt.localeCompare(a.createdAt)
+        );
+
+        this.tutors.set(sorted);
+      },
+      error: () => {
+        this.tutors.set([]);
+      },
+    });
+  }
 }

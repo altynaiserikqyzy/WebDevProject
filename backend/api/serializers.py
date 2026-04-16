@@ -1,42 +1,51 @@
-from django.contrib.auth import authenticate
+from django.contrib.auth.models import User
 from rest_framework import serializers
 
-from .models import Booking, ChatMessage, Review, Subject, TutorAvailability, TutorProfile, TutoringService
+from .models import Conversation, ConversationParticipant, Message, Profile, Subject, TutorService
 
 
-class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField()
-    password = serializers.CharField(write_only=True)
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email']
 
+class ProfileSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
 
-class LogoutSerializer(serializers.Serializer):
-    refresh = serializers.CharField()
-
+    class Meta:
+        model = Profile
+        fields = [
+            'id',
+            'user',
+            'full_name',
+            'bio',
+            'major',
+            'study_year',
+            'avatar',
+            'is_tutor',
+        ]
 
 class SubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subject
-        fields = ['id', 'name', 'icon']
+        fields = ['id', 'name']
 
-
-class TutoringServiceSerializer(serializers.ModelSerializer):
-    tutor_username = serializers.CharField(source='tutor.user.username', read_only=True)
-    subject_name = serializers.CharField(source='subject.name', read_only=True)
-    tutor_photo = serializers.ImageField(source='tutor.photo', read_only=True)
-    tutor_rating = serializers.DecimalField(source='tutor.rating', read_only=True, max_digits=3, decimal_places=2)
-    tutor_study_year = serializers.IntegerField(source='tutor.study_year', read_only=True)
+class TutorServiceSerializer(serializers.ModelSerializer):
+    tutor = ProfileSerializer(read_only=True)
+    subject = SubjectSerializer(read_only=True)
+    subject_id = serializers.PrimaryKeyRelatedField(
+        queryset=Subject.objects.all(),
+        source='subject',
+        write_only=True
+    )
 
     class Meta:
-        model = TutoringService
+        model = TutorService
         fields = [
             'id',
             'tutor',
-            'tutor_username',
-            'tutor_photo',
-            'tutor_rating',
-            'tutor_study_year',
             'subject',
-            'subject_name',
+            'subject_id',
             'title',
             'description',
             'price_per_hour',
@@ -44,73 +53,46 @@ class TutoringServiceSerializer(serializers.ModelSerializer):
             'is_active',
             'created_at',
         ]
-        read_only_fields = ['tutor', 'created_at']
 
-
-class TutorProfileSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', read_only=True)
-    photo = serializers.ImageField(read_only=True)
+class ConversationParticipantSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
 
     class Meta:
-        model = TutorProfile
-        fields = ['id', 'username', 'bio', 'photo', 'study_year', 'course', 'rating', 'total_reviews', 'google_meet_link']
+        model = ConversationParticipant
+        fields = ['id', 'user', 'joined_at']
 
 
-class TutorProfileDetailSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', read_only=True)
-    photo = serializers.ImageField(read_only=True)
-    services = TutoringServiceSerializer(many=True, read_only=True)
+class MessageSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)
 
     class Meta:
-        model = TutorProfile
-        fields = ['id', 'username', 'bio', 'photo', 'study_year', 'course', 'rating', 'total_reviews', 'google_meet_link', 'services']
+        model = Message
+        fields = ['id', 'conversation', 'sender', 'text', 'created_at']
+        read_only_fields = ['sender', 'created_at', 'conversation']
 
 
-class BookingSerializer(serializers.ModelSerializer):
-    service_title = serializers.CharField(source='service.title', read_only=True)
-    student_username = serializers.CharField(source='student.username', read_only=True)
-    tutor_username = serializers.CharField(source='service.tutor.user.username', read_only=True)
-
-    class Meta:
-        model = Booking
-        fields = [
-            'id',
-            'service',
-            'service_title',
-            'student',
-            'student_username',
-            'tutor_username',
-            'scheduled_for',
-            'notes',
-            'status',
-            'number_of_sessions',
-            'total_price',
-            'event_color',
-            'created_at',
-        ]
-        read_only_fields = ['student', 'created_at', 'status', 'total_price']
-
-
-class ChatMessageSerializer(serializers.ModelSerializer):
-    sender_username = serializers.CharField(source='sender.username', read_only=True)
+class ConversationSerializer(serializers.ModelSerializer):
+    participants = ConversationParticipantSerializer(many=True, read_only=True)
+    last_message = serializers.SerializerMethodField()
 
     class Meta:
-        model = ChatMessage
-        fields = ['id', 'booking', 'sender', 'sender_username', 'text', 'created_at']
-        read_only_fields = ['sender', 'created_at']
+        model = Conversation
+        fields = ['id', 'participants', 'last_message', 'created_at', 'updated_at']
 
-
-class ReviewSerializer(serializers.ModelSerializer):
-    reviewer_username = serializers.CharField(source='reviewer.username', read_only=True)
-
-    class Meta:
-        model = Review
-        fields = ['id', 'tutor', 'reviewer', 'reviewer_username', 'rating', 'comment', 'created_at']
-        read_only_fields = ['reviewer', 'created_at']
-
-
-class TutorAvailabilitySerializer(serializers.ModelSerializer):
-    class Meta:
-        model = TutorAvailability
-        fields = ['id', 'tutor', 'weekday', 'start_time', 'end_time', 'is_available']
-        read_only_fields = ['tutor']
+    def get_last_message(self, obj):
+        last_message = obj.messages.order_by('-created_at').first()
+        if not last_message:
+            return None
+        return MessageSerializer(last_message).data
+class SignupSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    full_name = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
+    password = serializers.CharField(write_only=True, min_length=8)
+    def validate_email(self, value):
+        if not value.endswith('@kbtu.kz'):
+            raise serializers.ValidationError('Only KBTU email addresses are allowed.')
+        return value
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField(required=True)
+    password = serializers.CharField(write_only=True, required=True)

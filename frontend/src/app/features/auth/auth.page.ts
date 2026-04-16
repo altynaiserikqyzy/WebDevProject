@@ -49,29 +49,27 @@ export class AuthPage {
     this.error = '';
 
     if (this.tab() === 'signup') {
-      const result = this.auth.signup({
+      this.auth.signup({
         fullName: this.fullName || 'KBTU Student',
         username: this.username,
         email: this.email,
         password: this.password,
+      }, {
+        next: () => this.router.navigateByUrl('/profile'),
+        error: (message) => {
+          this.error = message;
+        },
       });
-
-      if (!result.ok) {
-        this.error = result.error;
-        return;
-      }
     } else {
-      const result = this.auth.login({
+      this.auth.login({
         username: this.username,
         password: this.password,
+      }, {
+        next: () => this.router.navigateByUrl('/profile'),
+        error: (message) => {
+          this.error = message;
+        },
       });
-
-      if (!result.ok) {
-        this.error = result.error;
-        return;
-      }
     }
-
-    this.router.navigateByUrl('/profile');
   }
 }

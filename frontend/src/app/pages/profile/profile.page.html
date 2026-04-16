@@ -70,6 +70,16 @@
             <label>Google Meet Link (for online sessions)</label>
             <input [(ngModel)]="googleMeetLink" name="googleMeetLink" class="form-input" placeholder="https://meet.google.com/..." />
           </div>
+          <div class="form-group">
+            <label for="avatar">Avatar</label>
+            <input
+              id="avatar"
+              type="file"
+              accept="image/*"
+              (change)="onAvatarSelected($event)"
+              class="form-input"
+            />
+          </div>
           <button class="btn-primary" (click)="onSaveProfileClick()" [disabled]="loading">
             @if (loading) {
               Saving...

@@ -1,31 +1,35 @@
-from django.urls import include, path
-from rest_framework.routers import DefaultRouter
+from django.urls import path
 
 from .views import (
-    BookingListCreateAPIView,
-    ChatMessageListCreateAPIView,
+    ConversationMessagesAPIView,
+    MyConversationListAPIView,
+    MyProfileAPIView,
+    StartConversationAPIView,
+    SubjectListAPIView,
+    TutorServiceDetailAPIView,
+    TutorServiceListCreateAPIView,
+    TutorStatusAPIView,
+    UserSearchAPIView,
+    SignupAPIView,
+    LoginAPIView,
     MeAPIView,
-    ReviewListCreateAPIView,
-    SubjectViewSet,
-    TutorAvailabilityListCreateAPIView,
-    TutorProfileDetailView,
-    TutoringServiceViewSet,
-    login_view,
-    logout_view,
+
+
 )
 
-router = DefaultRouter()
-router.register(r'subjects', SubjectViewSet, basename='subject')
-router.register(r'services', TutoringServiceViewSet, basename='service')
-
 urlpatterns = [
-    path('auth/login/', login_view, name='login'),
-    path('auth/logout/', logout_view, name='logout'),
-    path('auth/me/', MeAPIView.as_view(), name='me'),
-    path('tutors/<int:profile_id>/', TutorProfileDetailView.as_view(), name='tutor-detail'),
-    path('tutors/<int:tutor_id>/reviews/', ReviewListCreateAPIView.as_view(), name='tutor-reviews'),
-    path('tutors/<int:tutor_id>/availability/', TutorAvailabilityListCreateAPIView.as_view(), name='tutor-availability'),
-    path('bookings/', BookingListCreateAPIView.as_view(), name='bookings'),
-    path('bookings/<int:booking_id>/messages/', ChatMessageListCreateAPIView.as_view(), name='messages'),
-    path('', include(router.urls)),
+    path('auth/signup/', SignupAPIView.as_view(), name='auth-signup'),
+    path('subjects/', SubjectListAPIView.as_view(), name='subject-list'),
+    path('services/', TutorServiceListCreateAPIView.as_view(), name='service-list-create'),
+    path('services/<int:pk>/', TutorServiceDetailAPIView.as_view(), name='service-detail'),
+    path('profile/me/', MyProfileAPIView.as_view(), name='my-profile'),
+    path('profile/tutor-status/', TutorStatusAPIView.as_view(), name='tutor-status'),
+    path('users/search/', UserSearchAPIView.as_view(), name='user-search'),
+    path('conversations/', MyConversationListAPIView.as_view(), name='conversation-list'),
+    path('conversations/start/', StartConversationAPIView.as_view(), name='conversation-start'),
+    path('conversations/<int:conversation_id>/messages/', ConversationMessagesAPIView.as_view(), name='conversation-messages'),
+    path('auth/login/', LoginAPIView.as_view(), name='auth-login'),
+    path('auth/me/', MeAPIView.as_view(), name='auth-me'),
+
+
 ]
