@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 
 import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
@@ -10,71 +11,75 @@ import { ChatPreview, ChatViewMessage, UserSearchResult } from '../../core/model
   imports: [FormsModule],
   template: `
     <section class="section-wrap">
-      <div class="grid h-[75vh] gap-4 lg:grid-cols-[320px,1fr]">
-        <aside class="glass flex flex-col gap-4 rounded-2xl p-4">
-          <div>
-            <p class="text-sm uppercase tracking-widest text-brand-200">Conversations</p>
-            <input
-              [(ngModel)]="threadSearch"
-              class="mt-3 w-full rounded-xl border border-white/20 bg-slate-900 px-3 py-2"
-              placeholder="Search your chats"
-            />
-          </div>
+      <div class="grid h-[75vh] gap-4" [class]="activeThread ? 'grid-cols-1' : 'lg:grid-cols-[320px,1fr]'">
+        @if (!activeThread) {
+          <aside class="glass flex flex-col gap-4 rounded-2xl p-4">
+            <div>
+              <p class="text-sm uppercase tracking-widest text-brand-200">Conversations</p>
+              <input
+                [(ngModel)]="threadSearch"
+                class="mt-3 w-full rounded-xl border border-white/20 bg-slate-900 px-3 py-2"
+                placeholder="Search your chats"
+              />
+            </div>
 
-          <div>
-            <p class="text-sm uppercase tracking-widest text-brand-200">Find registered users</p>
-            <input
-              [(ngModel)]="userSearch"
-              (ngModelChange)="refreshUserSearch()"
-              class="mt-3 w-full rounded-xl border border-white/20 bg-slate-900 px-3 py-2"
-              placeholder="Start typing a name, username or email"
-            />
-            @if (!hasUserSearch()) {
-              <p class="mt-3 rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
-                Search for a user to start a conversation.
-              </p>
-            }
-            <div class="mt-3 max-h-44 space-y-2 overflow-y-auto">
-              @for (user of foundUsers; track user.id) {
-                <button class="w-full rounded-xl border border-white/10 bg-slate-900/80 p-3 text-left transition hover:bg-slate-800" (click)="openChatWith(user)">
-                  <p class="font-medium">{{ user.fullName }}</p>
-                  <p class="text-xs text-slate-400">@{{ user.username }} · {{ user.email }}</p>
-                </button>
-              } @empty {
-                @if (hasUserSearch()) {
-                  <p class="rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
-                    No users matched your search.
-                  </p>
+            <div>
+              <p class="text-sm uppercase tracking-widest text-brand-200">Find registered users</p>
+              <input
+                [(ngModel)]="userSearch"
+                (ngModelChange)="refreshUserSearch()"
+                class="mt-3 w-full rounded-xl border border-white/20 bg-slate-900 px-3 py-2"
+                placeholder="Start typing a name, username or email"
+              />
+              @if (!hasUserSearch()) {
+                <p class="mt-3 rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
+                  Search for a user to start a conversation.
+                </p>
+              }
+              <div class="mt-3 max-h-44 space-y-2 overflow-y-auto">
+                @for (user of foundUsers; track user.id) {
+                  <button class="w-full rounded-xl border border-white/10 bg-slate-900/80 p-3 text-left transition hover:bg-slate-800" (click)="openChatWith(user)">
+                    <p class="font-medium">{{ user.fullName }}</p>
+                    <p class="text-xs text-slate-400">@{{ user.username }} · {{ user.email }}</p>
+                  </button>
+                } @empty {
+                  @if (hasUserSearch()) {
+                    <p class="rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">
+                      No users matched your search.
+                    </p>
+                  }
                 }
-              }
+              </div>
             </div>
-          </div>
 
-          <div class="min-h-0 flex-1 overflow-y-auto">
-            <div class="space-y-2">
-              @for (thread of filteredThreads(); track thread.id) {
-                <button
-                  class="w-full rounded-xl p-3 text-left transition"
-                  [class]="activeThread?.id === thread.id ? 'bg-brand-500/20 ring-1 ring-brand-300' : 'bg-slate-900/80 hover:bg-slate-800'"
-                  (click)="selectThread(thread.id)"
-                >
-                  <p class="font-medium">{{ thread.otherUser.fullName }}</p>
-                  <p class="text-xs text-slate-400">@{{ thread.otherUser.username }}</p>
-                  <p class="mt-1 truncate text-sm text-slate-300">{{ thread.lastMessage }}</p>
-                </button>
-              } @empty {
-                <p class="rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">No chats yet. Start one from the registered users list.</p>
-              }
+            <div class="min-h-0 flex-1 overflow-y-auto">
+              <div class="space-y-2">
+                @for (thread of filteredThreads(); track thread.id) {
+                  <button
+                    class="w-full rounded-xl bg-slate-900/80 p-3 text-left transition hover:bg-slate-800"
+                    (click)="selectThread(thread.id)"
+                  >
+                    <p class="font-medium">{{ thread.otherUser.fullName }}</p>
+                    <p class="text-xs text-slate-400">@{{ thread.otherUser.username }}</p>
+                    <p class="mt-1 truncate text-sm text-slate-300">{{ thread.lastMessage }}</p>
+                  </button>
+                } @empty {
+                  <p class="rounded-xl border border-dashed border-white/10 px-3 py-4 text-sm text-slate-400">No chats yet. Start one from the registered users list.</p>
+                }
+              </div>
             </div>
-          </div>
-        </aside>
+          </aside>
+        }
 
-        <article class="glass flex rounded-2xl p-4">
+        <article class="glass flex rounded-2xl p-4" [class]="activeThread ? 'glass flex min-h-[75vh] rounded-2xl p-4' : 'glass flex rounded-2xl p-4'">
           @if (activeThread) {
             <div class="flex w-full flex-col">
-              <div class="border-b border-white/10 pb-3">
-                <p class="text-lg font-semibold">{{ activeThread.otherUser.fullName }}</p>
-                <p class="text-sm text-slate-400">@{{ activeThread.otherUser.username }} · {{ activeThread.otherUser.email }}</p>
+              <div class="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+                <div>
+                  <p class="text-lg font-semibold">{{ activeThread.otherUser.fullName }}</p>
+                  <p class="text-sm text-slate-400">@{{ activeThread.otherUser.username }} · {{ activeThread.otherUser.email }}</p>
+                </div>
+                <button class="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-900" (click)="closeThread()">X</button>
               </div>
 
               <div class="flex-1 space-y-3 overflow-y-auto py-4">
@@ -120,9 +125,22 @@ export class ChatPage {
 
   constructor(
     public readonly auth: AuthService,
-    private readonly api: ApiService
+    private readonly api: ApiService,
+    private readonly route: ActivatedRoute
   ) {
     this.loadConversations();
+    this.route.queryParamMap.subscribe((params) => {
+      const userId = Number(params.get('userId'));
+      if (userId) {
+        this.openChatWith({
+          id: userId,
+          username: '',
+          email: '',
+          fullName: 'Loading...',
+          avatar: '',
+        });
+      }
+    });
   }
 
   filteredThreads() {
@@ -148,7 +166,7 @@ export class ChatPage {
           id: user.id,
           username: user.username,
           email: user.email,
-          fullName: user.username,
+          fullName: user.full_name || user.username,
           avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(user.username)}`,
         }));
       },
@@ -174,6 +192,12 @@ export class ChatPage {
     if (thread) {
       this.loadMessages(thread.id);
     }
+  }
+
+  closeThread() {
+    this.activeThread = null;
+    this.activeMessages = [];
+    this.draft = '';
   }
 
   send() {
@@ -202,8 +226,8 @@ export class ChatPage {
     this.api.listConversations().subscribe({
       next: (conversations) => {
         this.threads = conversations.map((conversation) => this.mapConversationToThread(conversation));
-        if (!this.activeThread && this.threads.length) {
-          this.selectThread(this.threads[0].id);
+        if (this.activeThread) {
+          this.activeThread = this.threads.find((thread) => thread.id === this.activeThread?.id) ?? this.activeThread;
         }
       },
       error: () => {
@@ -241,7 +265,7 @@ export class ChatPage {
         id: otherUser.id,
         username: otherUser.username,
         email: otherUser.email,
-        fullName: otherUser.username,
+        fullName: otherUser.full_name || otherUser.username,
         avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(otherUser.username)}`,
       },
       lastMessage: conversation.last_message?.text ?? 'Start your conversation.',

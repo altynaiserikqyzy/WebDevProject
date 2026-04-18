@@ -1,5 +1,8 @@
+import time
+
 from django.contrib.auth.models import User 
-from django.contrib.auth import authenticate
+from django.db import OperationalError
+from django.contrib.auth.hashers import check_password
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,41 +18,89 @@ from .serializers import (
     UserSerializer, SignupSerializer, LoginSerializer,
 )
 
+
+def with_db_retry(operation, retries=5, delay=0.15):
+    last_error = None
+    for attempt in range(retries):
+        try:
+            return operation()
+        except OperationalError as exc:
+            if 'database is locked' not in str(exc).lower():
+                raise
+            last_error = exc
+            if attempt == retries - 1:
+                raise
+            time.sleep(delay)
+    raise last_error
+
 class SubjectListAPIView(generics.ListAPIView):
     queryset = Subject.objects.all().order_by('name')
     serializer_class = SubjectSerializer
     permission_classes = [permissions.AllowAny]
 
 
-class TutorServiceDetailAPIView(generics.RetrieveAPIView):
-    queryset = TutorService.objects.select_related('tutor__user', 'subject')
-    serializer_class = TutorServiceSerializer
-    permission_classes = [permissions.AllowAny]
+class TutorServiceDetailAPIView(APIView):
+    def get_permissions(self):
+        if self.request.method == 'DELETE':
+            return [permissions.IsAuthenticated()]
+        return [permissions.AllowAny()]
+
+    def get(self, request, pk):
+        try:
+            service = TutorService.objects.select_related('tutor__user', 'subject').get(pk=pk)
+        except TutorService.DoesNotExist:
+            return Response({'detail': 'Service not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = TutorServiceSerializer(service)
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        try:
+            service = TutorService.objects.select_related('tutor__user').get(pk=pk)
+        except TutorService.DoesNotExist:
+            return Response({'detail': 'Service not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if service.tutor.user_id != request.user.id:
+            return Response({'detail': 'You can delete only your own service.'}, status=status.HTTP_403_FORBIDDEN)
+
+        service.is_active = False
+        with_db_retry(lambda: service.save(update_fields=['is_active']))
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MyProfileAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        profile, _ = Profile.objects.get_or_create(
-            user=request.user,
-            defaults={'full_name': request.user.username},
-        )
+        profile = Profile.objects.select_related('user').filter(user=request.user).first()
+        if profile is None:
+            profile, _ = with_db_retry(lambda: Profile.objects.get_or_create(
+                user=request.user,
+                defaults={'full_name': request.user.username},
+            ))
         serializer = ProfileSerializer(profile)
         return Response(serializer.data)
 
     def patch(self, request):
-        profile, _ = Profile.objects.get_or_create(
+        profile, _ = with_db_retry(lambda: Profile.objects.get_or_create(
             user=request.user,
             defaults={'full_name': request.user.username},
-        )
+        ))
 
         serializer = ProfileSerializer(profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        with_db_retry(lambda: serializer.save())
 
         return Response(serializer.data)
 
+class MyServicesAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+    def get(self, request):
+        services = TutorService.objects.select_related('tutor__user', 'subject').filter(
+            tutor__user=request.user
+        ).order_by('-created_at')
+        serializer = TutorServiceSerializer(services, many=True)
+        return Response(serializer.data)
 
 class TutorServiceListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -87,16 +138,16 @@ class TutorServiceListCreateAPIView(APIView):
         return Response(serializer.data)
 
     def post(self, request):
-        profile, _ = Profile.objects.get_or_create(
+        profile, _ = with_db_retry(lambda: Profile.objects.get_or_create(
             user=request.user,
             defaults={'full_name': request.user.username},
-        )
+        ))
         if not profile.is_tutor:
             profile.is_tutor = True
-            profile.save()
+            with_db_retry(lambda: profile.save())
         serializer = TutorServiceSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(tutor=profile)
+        with_db_retry(lambda: serializer.save(tutor=profile))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -153,9 +204,9 @@ class StartConversationAPIView(APIView):
                 break
 
         if conversation is None:
-            conversation = Conversation.objects.create()
-            ConversationParticipant.objects.create(conversation=conversation, user=request.user)
-            ConversationParticipant.objects.create(conversation=conversation, user=other_user)
+            conversation = with_db_retry(lambda: Conversation.objects.create())
+            with_db_retry(lambda: ConversationParticipant.objects.create(conversation=conversation, user=request.user))
+            with_db_retry(lambda: ConversationParticipant.objects.create(conversation=conversation, user=other_user))
 
         serializer = ConversationSerializer(conversation)
         return Response(serializer.data)
@@ -191,9 +242,9 @@ class ConversationMessagesAPIView(APIView):
 
         serializer = MessageSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(conversation=conversation, sender=request.user)
+        with_db_retry(lambda: serializer.save(conversation=conversation, sender=request.user))
 
-        conversation.save()
+        with_db_retry(lambda: conversation.save())
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -216,15 +267,15 @@ class SignupAPIView(APIView):
                 {'detail': 'Email already exists.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        user = User.objects.create_user(
+        user = with_db_retry(lambda: User.objects.create_user(
             username=username,
             email=email,
             password=password,
-        )
-        Profile.objects.create(
+        ))
+        with_db_retry(lambda: Profile.objects.create(
             user=user,
             full_name=full_name
-        )
+        ))
         refresh = RefreshToken.for_user(user)
         return Response(
             {
@@ -243,10 +294,10 @@ class TutorStatusAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request):
-        profile, _ = Profile.objects.get_or_create(
+        profile, _ = with_db_retry(lambda: Profile.objects.get_or_create(
             user=request.user,
             defaults={'full_name': request.user.username},
-        )
+        ))
 
         is_tutor = request.data.get('is_tutor')
         if is_tutor is None:
@@ -256,7 +307,7 @@ class TutorStatusAPIView(APIView):
             )
 
         profile.is_tutor = bool(is_tutor)
-        profile.save(update_fields=['is_tutor'])
+        with_db_retry(lambda: profile.save(update_fields=['is_tutor']))
 
         if not profile.is_tutor:
             TutorService.objects.filter(
@@ -274,11 +325,19 @@ class LoginAPIView(APIView):
 
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
-        user = authenticate(username = username , password = password)
-        if user is None:
+
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
             return Response({
                 "detail":"Incorrect username or password"
             } , status=status.HTTP_401_UNAUTHORIZED)
+
+        if not check_password(password, user.password):
+            return Response({
+                "detail":"Incorrect username or password"
+            } , status=status.HTTP_401_UNAUTHORIZED)
+
         refresh = RefreshToken.for_user(user)
 
         return Response({

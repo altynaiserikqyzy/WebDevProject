@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import { ApiService } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 
 @Component({
@@ -45,11 +46,15 @@ import { AuthService } from '../../core/auth.service';
             <input [(ngModel)]="fullName" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Full name" />
             <input [(ngModel)]="major" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Major" />
             <input [(ngModel)]="studyYear" type="number" min="1" max="6" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Study year" />
-            <input [(ngModel)]="avatar" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Avatar URL" />
             <textarea [(ngModel)]="bio" rows="4" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3 md:col-span-2" placeholder="Bio"></textarea>
+            @if (error()) {
+              <p class="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 md:col-span-2">{{ error() }}</p>
+            }
             <div class="flex gap-3 md:col-span-2">
-              <button class="btn-primary" (click)="save()">Save</button>
-              <button class="btn-secondary" (click)="toggleEdit()">Cancel</button>
+              <button class="btn-primary disabled:cursor-not-allowed disabled:opacity-60" [disabled]="saving()" (click)="save()">
+                {{ saving() ? 'Saving...' : 'Save' }}
+              </button>
+              <button class="btn-secondary" [disabled]="saving()" (click)="toggleEdit()">Cancel</button>
             </div>
           </article>
         }
@@ -78,6 +83,50 @@ import { AuthService } from '../../core/auth.service';
         }
 
         <article class="glass p-6">
+          <div class="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 class="text-xl font-semibold">My Services</h2>
+              <p class="mt-1 text-slate-300">Services you have published appear here.</p>
+            </div>
+            @if (user.isTutor) {
+              <a routerLink="/profile/create-service" class="btn-secondary inline-flex">Add New Service</a>
+            }
+          </div>
+
+          <div class="mt-4 rounded-xl border border-white/10 bg-slate-900/60 px-4 py-3 text-sm text-slate-400">
+            @if (servicesLoading()) {
+              Loading services...
+            } @else {
+              Services found: {{ myServices().length }}
+            }
+          </div>
+
+          <div class="mt-5 grid gap-4 md:grid-cols-2">
+            @for (service of myServices(); track service.id) {
+              <article class="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
+                <div class="flex items-start justify-between gap-3">
+                <div>
+                  <h3 class="font-semibold text-white">{{ service.title }}</h3>
+                  <p class="mt-1 text-sm text-brand-200">
+                    {{ service.subject }} · {{ service.price }} KZT/h · {{ service.format }}
+                  </p>
+                </div>
+
+                <div class="flex gap-2">
+                  <button (click)="deleteService(service.id)">Delete</button>
+                </div>
+              </div>
+                              <p class="mt-3 text-sm text-slate-300">{{ service.description }}</p>
+              </article>
+            } @empty {
+              <article class="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-slate-400 md:col-span-2">
+                You have not published any services yet.
+              </article>
+            }
+          </div>
+        </article>
+
+        <article class="glass p-6">
           <h2 class="text-xl font-semibold">Start chatting</h2>
           <p class="mt-1 text-slate-300">Use the chat page to find registered users and open one unique conversation per pair.</p>
           <a routerLink="/chat" class="btn-secondary mt-4 inline-flex">Open Chat</a>
@@ -88,18 +137,22 @@ import { AuthService } from '../../core/auth.service';
 })
 export class ProfilePage {
   editing = false;
+  readonly saving = signal(false);
+  readonly error = signal('');
+  readonly servicesLoading = signal(true);
   fullName = '';
   bio = '';
   major = '';
   studyYear = 1;
-  avatar = '';
+  readonly myServices = signal<Array<any>>([]);
 
   constructor(
-    public readonly auth: AuthService
+    public readonly auth: AuthService,
+    private readonly api: ApiService
   ) {
-    if (!this.auth.user()) {
-      this.auth.loadProfile();
-    }
+    this.auth.loadProfile(() => {
+      this.loadMyServices();
+    });
   }
 
   toggleEdit() {
@@ -108,25 +161,63 @@ export class ProfilePage {
       this.fillForm();
     }
   }
+  deleteService(id: number) {
+  if (!confirm('Delete this service?')) return;
 
+  this.api.deleteService(id).subscribe({
+    next: () => {
+      // удалить из UI сразу (без reload)
+      this.myServices.update(services =>
+        services.filter(s => s.id !== id)
+      );
+    },
+    error: (err) => {
+      console.log(err);
+      alert('Failed to delete');
+    }
+  });
+}
   save() {
+    const fullName = this.fullName.trim();
+    const major = this.major.trim();
+    const bio = this.bio.trim();
+    const studyYear = Number(this.studyYear);
+
+    if (!fullName) {
+      this.error.set('Full name is required.');
+      return;
+    }
+    if (!Number.isFinite(studyYear) || studyYear < 1 || studyYear > 6) {
+      this.error.set('Study year must be between 1 and 6.');
+      return;
+    }
+
+    this.error.set('');
+    this.saving.set(true);
     this.auth.updateProfile({
-      fullName: this.fullName,
-      bio: this.bio,
-      major: this.major,
-      studyYear: Number(this.studyYear) || 1,
-      avatar: this.avatar.trim(),
+      fullName,
+      bio,
+      major,
+      studyYear,
     }, () => {
+      this.saving.set(false);
       this.editing = false;
+    }, (message) => {
+      this.saving.set(false);
+      this.error.set(message);
     });
   }
 
   becomeTutor() {
-    this.auth.becomeTutor();
+    this.auth.becomeTutor(() => {
+      this.loadMyServices();
+    });
   }
 
   disableTutorMode() {
-    this.auth.setTutorStatus(false);
+    this.auth.setTutorStatus(false, () => {
+      this.myServices.set([]);
+    });
   }
 
   private fillForm() {
@@ -139,6 +230,31 @@ export class ProfilePage {
     this.bio = user.bio;
     this.major = user.major;
     this.studyYear = user.studyYear;
-    this.avatar = user.avatar;
+    this.error.set('');
+  }
+
+  private loadMyServices() {
+    this.servicesLoading.set(true);
+    this.api.getMyServices().subscribe({
+      next: (services) => {
+        this.myServices.set(
+          services
+            .map((service) => ({
+              id: service.id,
+              title: service.title,
+              description: service.description,
+              subject: service.subject?.name ?? 'Subject',
+              price: service.price_per_hour,
+              format: service.format,
+            }))
+            .sort((a, b) => b.id - a.id)
+        );
+        this.servicesLoading.set(false);
+      },
+      error: () => {
+        this.myServices.set([]);
+        this.servicesLoading.set(false);
+      },
+    });
   }
 }

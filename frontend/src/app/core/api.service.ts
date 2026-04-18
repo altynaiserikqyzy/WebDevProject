@@ -86,7 +86,27 @@ export class ApiService {
   listSubjects(): Observable<Subject[]> {
     return this.http.get<Subject[]>(`${this.baseUrl}/subjects/`);
   }
+  deleteService(id: number) {
+    return this.http.delete(`${this.baseUrl}/services/${id}/`);
+}
 
+  publish(payload: {
+    subjectId?: number;
+    subjectName?: string;
+    pricePerHour: number;
+    title: string;
+    description: string;
+    format: string;
+  }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/services/`, {
+      subject_id: payload.subjectId,
+      subject_name: payload.subjectName,
+      price_per_hour: payload.pricePerHour,
+      title: payload.title,
+      description: payload.description,
+      format: payload.format
+    });
+  }
   listServices(params?: {
     search?: string;
     subject?: string | number;
@@ -108,9 +128,13 @@ export class ApiService {
   getService(id: number): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/services/${id}/`);
   }
+  getMyServices(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/services/my/`);
+  }
 
   createService(payload: {
-    subject_id: number;
+    subject_id?: number;
+    subject_name?: string;
     title: string;
     description: string;
     price_per_hour: string;
@@ -119,8 +143,9 @@ export class ApiService {
     return this.http.post<any>(`${this.baseUrl}/services/`, payload);
   }
 
-  searchUsers(query: string): Observable<Array<{ id: number; username: string; email: string }>> {
-    return this.http.get<Array<{ id: number; username: string; email: string }>>(
+
+  searchUsers(query: string): Observable<Array<{ id: number; username: string; email: string; full_name: string }>> {
+    return this.http.get<Array<{ id: number; username: string; email: string; full_name: string }>>(
       `${this.baseUrl}/users/search/?q=${encodeURIComponent(query)}`
     );
   }
@@ -140,4 +165,5 @@ export class ApiService {
   sendConversationMessage(conversationId: number, text: string): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/conversations/${conversationId}/messages/`, { text });
   }
+
 }

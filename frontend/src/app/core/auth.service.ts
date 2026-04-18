@@ -7,15 +7,16 @@ import { AuthUser, LoginRequest, SignupRequest } from './models';
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly userState = signal<AuthUser | null>(null);
+  private readonly accessTokenState = signal<string | null>(localStorage.getItem('access'));
 
   readonly user = computed(() => this.userState());
-  readonly isLoggedIn = computed(() => !!this.userState() && !!localStorage.getItem('access'));
+  readonly isLoggedIn = computed(() => !!this.accessTokenState());
 
   constructor(
     private readonly router: Router,
     private readonly api: ApiService
   ) {
-    if (localStorage.getItem('access')) {
+    if (this.accessTokenState()) {
       this.loadProfile();
     }
   }
@@ -28,10 +29,23 @@ export class AuthService {
       next: (response) => {
         localStorage.setItem('access', response.access);
         localStorage.setItem('refresh', response.refresh);
-        this.loadProfile(handlers.next, handlers.error);
+        this.accessTokenState.set(response.access);
+        this.userState.set({
+          id: response.user.id,
+          fullName: payload.fullName,
+          username: response.user.username,
+          email: response.user.email,
+          bio: '',
+          major: '',
+          studyYear: 1,
+          avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(response.user.username)}`,
+          isTutor: false,
+        });
+        handlers.next();
+        this.loadProfile(undefined, undefined);
       },
       error: (err) => {
-        handlers.error(err?.error?.detail ?? 'Signup failed.');
+        handlers.error(this.extractErrorMessage(err, 'Signup failed.'));
       },
     });
   }
@@ -44,10 +58,23 @@ export class AuthService {
       next: (response) => {
         localStorage.setItem('access', response.access);
         localStorage.setItem('refresh', response.refresh);
-        this.loadProfile(handlers.next, handlers.error);
+        this.accessTokenState.set(response.access);
+        this.userState.set({
+          id: response.user_id,
+          fullName: response.username,
+          username: response.username,
+          email: response.email,
+          bio: '',
+          major: '',
+          studyYear: 1,
+          avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(response.username)}`,
+          isTutor: false,
+        });
+        handlers.next();
+        this.loadProfile(undefined, undefined);
       },
       error: (err) => {
-        handlers.error(err?.error?.detail ?? 'Login failed.');
+        handlers.error(this.extractErrorMessage(err, 'Login failed.'));
       },
     });
   }
@@ -71,12 +98,13 @@ export class AuthService {
   logout() {
     localStorage.removeItem('access');
     localStorage.removeItem('refresh');
+    this.accessTokenState.set(null);
     this.userState.set(null);
     this.router.navigateByUrl('/auth');
   }
 
   updateProfile(
-    payload: { fullName: string; bio: string; major: string; studyYear: number; avatar?: string },
+    payload: { fullName: string; bio: string; major: string; studyYear: number },
     onDone?: () => void,
     onError?: (message: string) => void
   ) {
@@ -85,14 +113,13 @@ export class AuthService {
       bio: payload.bio,
       major: payload.major,
       study_year: payload.studyYear,
-      avatar: payload.avatar,
     }).subscribe({
       next: (profile) => {
         this.userState.set(this.mapProfileToUser(profile));
         onDone?.();
       },
       error: (err) => {
-        onError?.(err?.error?.detail ?? 'Failed to update profile.');
+        onError?.(this.extractErrorMessage(err, 'Failed to update profile.'));
       },
     });
   }
@@ -104,8 +131,10 @@ export class AuthService {
         onDone?.();
       },
       error: (err) => {
-        this.logout();
-        onError?.(err?.error?.detail ?? 'Failed to load profile.');
+        if (err?.status === 401) {
+          this.logout();
+        }
+        onError?.(this.extractErrorMessage(err, 'Failed to load profile.'));
       },
     });
   }
@@ -130,5 +159,25 @@ export class AuthService {
       avatar: profile.avatar || `https://i.pravatar.cc/160?u=${encodeURIComponent(profile.user.username)}`,
       isTutor: profile.is_tutor,
     };
+  }
+
+  private extractErrorMessage(err: any, fallback: string) {
+    const detail = err?.error?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+
+    const errorBody = err?.error;
+    if (errorBody && typeof errorBody === 'object') {
+      const firstValue = Object.values(errorBody)[0];
+      if (Array.isArray(firstValue) && typeof firstValue[0] === 'string') {
+        return firstValue[0];
+      }
+      if (typeof firstValue === 'string' && firstValue.trim()) {
+        return firstValue;
+      }
+    }
+
+    return fallback;
   }
 }

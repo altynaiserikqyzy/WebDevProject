@@ -29,7 +29,9 @@ import { AuthService } from '../../core/auth.service';
           <input [(ngModel)]="username" name="username" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Username" required />
           <input [(ngModel)]="email" name="email" type="email" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Email" [required]="tab() === 'signup'" />
           <input [(ngModel)]="password" name="password" type="password" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Password" required minlength="6" />
-          <button class="btn-primary w-full">{{ tab() === 'login' ? 'Login' : 'Create Account' }}</button>
+          <button class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" [disabled]="submitting()">
+            {{ submitting() ? 'Please wait...' : (tab() === 'login' ? 'Login' : 'Create Account') }}
+          </button>
         </form>
       </article>
     </section>
@@ -37,16 +39,26 @@ import { AuthService } from '../../core/auth.service';
 })
 export class AuthPage {
   readonly tab = signal<'login' | 'signup'>('login');
+  readonly submitting = signal(false);
   fullName = '';
   username = '';
   email = '';
   password = '';
   error = '';
 
-  constructor(private readonly auth: AuthService, private readonly router: Router) {}
+  constructor(private readonly auth: AuthService, private readonly router: Router) {
+    if (this.auth.isLoggedIn()) {
+      this.openProfile();
+    }
+  }
 
   submit() {
+    if (this.submitting()) {
+      return;
+    }
+
     this.error = '';
+    this.submitting.set(true);
 
     if (this.tab() === 'signup') {
       this.auth.signup({
@@ -55,8 +67,9 @@ export class AuthPage {
         email: this.email,
         password: this.password,
       }, {
-        next: () => this.router.navigateByUrl('/profile'),
+        next: () => this.openProfile(),
         error: (message) => {
+          this.submitting.set(false);
           this.error = message;
         },
       });
@@ -65,11 +78,21 @@ export class AuthPage {
         username: this.username,
         password: this.password,
       }, {
-        next: () => this.router.navigateByUrl('/profile'),
+        next: () => this.openProfile(),
         error: (message) => {
+          this.submitting.set(false);
           this.error = message;
         },
       });
     }
+  }
+
+  private openProfile() {
+    this.router.navigateByUrl('/profile').then((navigated) => {
+      this.submitting.set(false);
+      if (!navigated && typeof window !== 'undefined') {
+        window.location.href = '/profile';
+      }
+    });
   }
 }

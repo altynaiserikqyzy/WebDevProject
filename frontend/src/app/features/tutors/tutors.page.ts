@@ -37,7 +37,7 @@ import { ApiService } from '../../core/api.service';
             </div>
             <p class="mt-3 text-sm text-slate-300">{{ tutor.description }}</p>
             <div class="mt-4 flex gap-2">
-              <a routerLink="/chat" class="btn-secondary px-4 py-2 text-sm">Message</a>
+              <a [routerLink]="['/chat']" [queryParams]="{ userId: tutor.userId }" class="btn-secondary px-4 py-2 text-sm">Message</a>
               <a [routerLink]="['/tutors', tutor.id]" class="btn-primary px-4 py-2 text-sm">View Profile</a>
             </div>
           </article>
@@ -51,7 +51,10 @@ import { ApiService } from '../../core/api.service';
 export class TutorsPage {
   readonly tutors = signal<Array<{
     id: number;
+    userId: number;
     name: string;
+    username: string;
+    subject: string;
     title: string;
     description: string;
     price: string;
@@ -84,23 +87,45 @@ export class TutorsPage {
   }
 
   private loadServices() {
-    this.api.listServices({
-      search: this.search || undefined,
-      format: this.format || undefined,
-    }).subscribe({
+    this.api.listServices().subscribe({
       next: (services) => {
+        const normalizedSearch = this.search.trim().toLowerCase();
         const mapped = services.map((service) => ({
           id: service.id,
-          name: service.tutor?.full_name ?? service.tutor?.user?.username ?? 'Tutor',
+          userId: service.tutor?.user?.id ?? 0,
+          name: service.tutor?.full_name?.trim() || service.tutor?.user?.username || 'Tutor',
+          username: service.tutor?.user?.username ?? '',
+          subject: service.subject?.name ?? '',
           title: service.title,
           description: service.description,
           price: service.price_per_hour,
-          format: service.format,
+          format: String(service.format ?? '').toLowerCase(),
           avatar: service.tutor?.avatar || `https://i.pravatar.cc/160?u=${encodeURIComponent(service.tutor?.user?.username ?? service.id)}`,
           createdAt: service.created_at,
         }));
 
-        const sorted = [...mapped].sort((a, b) =>
+        const deduped = Array.from(
+          new Map(
+            mapped.map((service) => [
+              `${service.username}|${service.subject}|${service.title}|${service.price}|${service.format}|${service.description}`.toLowerCase(),
+              service,
+            ])
+          ).values()
+        );
+
+        const formatFiltered = this.format
+          ? deduped.filter((service) => service.format === this.format.toLowerCase())
+          : deduped;
+
+        const filtered = normalizedSearch
+          ? formatFiltered.filter((service) =>
+              `${service.name} ${service.username} ${service.subject} ${service.title} ${service.description}`
+                .toLowerCase()
+                .includes(normalizedSearch)
+            )
+          : formatFiltered;
+
+        const sorted = [...filtered].sort((a, b) =>
           this.sort === 'price'
             ? Number(a.price) - Number(b.price)
             : b.createdAt.localeCompare(a.createdAt)

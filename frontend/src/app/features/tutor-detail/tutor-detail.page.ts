@@ -8,7 +8,19 @@ import { ApiService } from '../../core/api.service';
   standalone: true,
   imports: [RouterLink, FormsModule],
   template: `
-    @if (tutor) {
+    @if (loading) {
+      <section class="section-wrap">
+        <article class="glass p-8 text-center text-slate-300">Loading tutor profile...</article>
+      </section>
+    } @else if (error) {
+      <section class="section-wrap">
+        <article class="glass p-8 text-center">
+          <p class="text-xl font-semibold text-white">Tutor profile is unavailable</p>
+          <p class="mt-3 text-slate-300">{{ error }}</p>
+          <a routerLink="/tutors" class="btn-secondary mt-5 inline-flex">Back to tutors</a>
+        </article>
+      </section>
+    } @else if (tutor) {
       <section class="section-wrap grid gap-6 lg:grid-cols-3">
         <article class="glass p-6 lg:col-span-2">
           <div class="flex items-center gap-4">
@@ -43,9 +55,9 @@ import { ApiService } from '../../core/api.service';
             <option>20:00</option>
           </select>
           <label class="mt-3 block text-sm text-slate-300">Sessions</label>
-          <input type="number" min="1" [(ngModel)]="sessionsCount" class="mt-1 w-full rounded-xl border border-white/20 bg-slate-900 px-3 py-2" />
+          <input type="number" min="1" [(ngModel)]="sessionsCount" (ngModelChange)="normalizeSessionsCount()" class="mt-1 w-full rounded-xl border border-white/20 bg-slate-900 px-3 py-2" />
           <p class="mt-4 text-sm text-brand-200">Total: {{ totalPrice() }} KZT</p>
-          <a routerLink="/chat" class="btn-primary mt-4 inline-flex w-full justify-center">Contact Tutor</a>
+          <a [routerLink]="['/chat']" [queryParams]="{ userId: tutor.userId }" class="btn-primary mt-4 inline-flex w-full justify-center">Contact Tutor</a>
         </aside>
       </section>
     }
@@ -54,6 +66,7 @@ import { ApiService } from '../../core/api.service';
 export class TutorDetailPage {
   tutor: {
     id: number;
+    userId: number;
     name: string;
     username: string;
     title: string;
@@ -64,6 +77,8 @@ export class TutorDetailPage {
     avatar: string;
     bio: string;
   } | null = null;
+  loading = true;
+  error = '';
   date = '2026-04-20';
   time = '18:00';
   sessionsCount = 1;
@@ -78,6 +93,7 @@ export class TutorDetailPage {
         next: (service) => {
           this.tutor = {
             id: service.id,
+            userId: service.tutor?.user?.id ?? 0,
             name: service.tutor?.full_name ?? service.tutor?.user?.username ?? 'Tutor',
             username: service.tutor?.user?.username ?? 'tutor',
             title: service.title,
@@ -88,12 +104,28 @@ export class TutorDetailPage {
             avatar: service.tutor?.avatar || `https://i.pravatar.cc/160?u=${encodeURIComponent(service.tutor?.user?.username ?? service.id)}`,
             bio: service.tutor?.bio ?? '',
           };
+          this.loading = false;
+        },
+        error: () => {
+          this.error = 'This tutor service could not be loaded.';
+          this.loading = false;
         },
       });
+    } else {
+      this.error = 'Invalid tutor link.';
+      this.loading = false;
     }
   }
 
   totalPrice() {
-    return (Number(this.tutor?.price ?? 0) || 0) * this.sessionsCount;
+    return (Number(this.tutor?.price ?? 0) || 0) * this.safeSessionsCount();
+  }
+
+  normalizeSessionsCount() {
+    this.sessionsCount = this.safeSessionsCount();
+  }
+
+  private safeSessionsCount() {
+    return Math.max(1, Number(this.sessionsCount) || 1);
   }
 }

@@ -5,9 +5,14 @@ from .models import Conversation, ConversationParticipant, Message, Profile, Sub
 
 
 class UserSerializer(serializers.ModelSerializer):
+    full_name = serializers.SerializerMethodField()
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email']
+        fields = ['id', 'username', 'email', 'full_name']
+
+    def get_full_name(self, obj):
+        return getattr(getattr(obj, 'profile', None), 'full_name', '') or obj.username
 
 class ProfileSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
@@ -36,8 +41,11 @@ class TutorServiceSerializer(serializers.ModelSerializer):
     subject_id = serializers.PrimaryKeyRelatedField(
         queryset=Subject.objects.all(),
         source='subject',
-        write_only=True
+        write_only=True,
+        required=False,
+        allow_null=True,
     )
+    subject_name = serializers.CharField(write_only=True, required=False, allow_blank=False)
 
     class Meta:
         model = TutorService
@@ -46,6 +54,7 @@ class TutorServiceSerializer(serializers.ModelSerializer):
             'tutor',
             'subject',
             'subject_id',
+            'subject_name',
             'title',
             'description',
             'price_per_hour',
@@ -53,6 +62,25 @@ class TutorServiceSerializer(serializers.ModelSerializer):
             'is_active',
             'created_at',
         ]
+
+    def validate(self, attrs):
+        subject = attrs.get('subject')
+        subject_name = self.initial_data.get('subject_name', '')
+
+        if not subject and not str(subject_name).strip():
+            raise serializers.ValidationError({'subject_name': 'Select a subject or enter one manually.'})
+
+        return attrs
+
+    def create(self, validated_data):
+        subject_name = str(validated_data.pop('subject_name', self.initial_data.get('subject_name', ''))).strip()
+        subject = validated_data.get('subject')
+
+        if subject is None:
+            subject, _ = Subject.objects.get_or_create(name=subject_name)
+            validated_data['subject'] = subject
+
+        return super().create(validated_data)
 
 class ConversationParticipantSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

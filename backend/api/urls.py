@@ -13,6 +13,7 @@ from .views import (
     SignupAPIView,
     LoginAPIView,
     MeAPIView,
+    MyServicesAPIView,
 
 
 )
@@ -30,6 +31,7 @@ urlpatterns = [
     path('conversations/<int:conversation_id>/messages/', ConversationMessagesAPIView.as_view(), name='conversation-messages'),
     path('auth/login/', LoginAPIView.as_view(), name='auth-login'),
     path('auth/me/', MeAPIView.as_view(), name='auth-me'),
-
+    path('profile/create-service/' , TutorServiceListCreateAPIView.as_view() , name='service-create'),
+    path('services/my/', MyServicesAPIView.as_view()),
 
 ]

@@ -18,10 +18,10 @@ import { PlatformService } from '../../core/platform.service';
             <option value="online">Online</option>
             <option value="offline">Offline</option>
           </select>
-          <input [(ngModel)]="sessionsCount" type="number" min="1" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" />
+          <input [(ngModel)]="sessionsCount" (ngModelChange)="normalizeSessionsCount()" type="number" min="1" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" />
         </div>
         <div class="mt-6 rounded-xl border border-brand-300/30 bg-brand-500/10 p-4">
-          <p>Total price: <span class="font-semibold text-brand-200">{{ sessionsCount * 7000 }} KZT</span></p>
+          <p>Total price: <span class="font-semibold text-brand-200">{{ safeSessionsCount() * 7000 }} KZT</span></p>
           <p class="text-sm text-slate-300">Mock payment summary included.</p>
         </div>
         <button class="btn-primary mt-5 w-full" (click)="confirm()">Confirm Booking</button>
@@ -43,17 +43,26 @@ export class BookingPage {
   constructor(private readonly platform: PlatformService) {}
 
   confirm() {
+    this.normalizeSessionsCount();
     this.platform.addBooking({
       tutorId: 1,
       subjectName: this.subject,
       date: this.date,
       time: this.time,
       format: this.format,
-      sessionsCount: this.sessionsCount,
-      totalPrice: this.sessionsCount * 7000,
+      sessionsCount: this.safeSessionsCount(),
+      totalPrice: this.safeSessionsCount() * 7000,
       eventColor: '#8b5cf6',
       meetLink: this.format === 'online' ? 'https://meet.google.com/new-kbtu-session' : undefined
     });
     this.success.set(true);
+  }
+
+  normalizeSessionsCount() {
+    this.sessionsCount = this.safeSessionsCount();
+  }
+
+  safeSessionsCount() {
+    return Math.max(1, Number(this.sessionsCount) || 1);
   }
 }
