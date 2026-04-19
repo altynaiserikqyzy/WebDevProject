@@ -1,8 +1,8 @@
 import time
 
+from django.contrib.auth import authenticate
 from django.contrib.auth.models import User 
 from django.db import OperationalError
-from django.contrib.auth.hashers import check_password
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -63,8 +63,7 @@ class TutorServiceDetailAPIView(APIView):
         if service.tutor.user_id != request.user.id:
             return Response({'detail': 'You can delete only your own service.'}, status=status.HTTP_403_FORBIDDEN)
 
-        service.is_active = False
-        with_db_retry(lambda: service.save(update_fields=['is_active']))
+        with_db_retry(lambda: service.delete())
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -149,6 +148,52 @@ class TutorServiceListCreateAPIView(APIView):
         serializer.is_valid(raise_exception=True)
         with_db_retry(lambda: serializer.save(tutor=profile))
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class TutorProfileListAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        profiles = (
+            Profile.objects.select_related('user')
+            .prefetch_related('services__subject')
+            .filter(is_tutor=True)
+        )
+
+        if request.user.is_authenticated:
+            profiles = profiles.exclude(user=request.user)
+
+        profiles = profiles.order_by('full_name')
+
+        return Response([self._serialize_profile(profile) for profile in profiles])
+
+    def _serialize_profile(self, profile):
+        services = profile.services.all().order_by('-created_at')
+
+        return {
+            **ProfileSerializer(profile).data,
+            'services': TutorServiceSerializer(services, many=True).data,
+        }
+
+class TutorProfileDetailAPIView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, pk):
+        try:
+            profile = (
+                Profile.objects.select_related('user')
+                .prefetch_related('services__subject')
+                .get(pk=pk, is_tutor=True)
+            )
+        except Profile.DoesNotExist:
+            return Response({'detail': 'Tutor profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        services = profile.services.all().order_by('-created_at')
+
+        return Response({
+            **ProfileSerializer(profile).data,
+            'services': TutorServiceSerializer(services, many=True).data,
+        })
 
 
 class UserSearchAPIView(APIView):
@@ -323,30 +368,33 @@ class LoginAPIView(APIView):
         serializer = LoginSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
 
-        username = serializer.validated_data['username']
+        username = serializer.validated_data['username'].strip()
         password = serializer.validated_data['password']
 
-        try:
-            user = User.objects.get(username=username)
-        except User.DoesNotExist:
+        user = User.objects.filter(username__iexact=username).first()
+        if user is None:
+            user = User.objects.filter(email__iexact=username).first()
+
+        if user is None:
             return Response({
                 "detail":"Incorrect username or password"
             } , status=status.HTTP_401_UNAUTHORIZED)
 
-        if not check_password(password, user.password):
+        authenticated_user = authenticate(request, username=user.username, password=password)
+        if authenticated_user is None:
             return Response({
                 "detail":"Incorrect username or password"
             } , status=status.HTTP_401_UNAUTHORIZED)
 
-        refresh = RefreshToken.for_user(user)
+        refresh = RefreshToken.for_user(authenticated_user)
 
         return Response({
             "detail":"Login successfully",
             'access': str(refresh.access_token),
             'refresh': str(refresh),
-            'user_id': user.id,
-            'username': user.username,
-            'email': user.email,
+            'user_id': authenticated_user.id,
+            'username': authenticated_user.username,
+            'email': authenticated_user.email,
         }, status=status.HTTP_200_OK)
 class MeAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]

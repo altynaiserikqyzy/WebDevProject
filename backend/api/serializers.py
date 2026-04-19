@@ -30,6 +30,14 @@ class ProfileSerializer(serializers.ModelSerializer):
             'is_tutor',
         ]
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+
+        if instance.avatar and instance.avatar.name.startswith(('http://', 'https://')):
+            data['avatar'] = instance.avatar.name
+
+        return data
+
 class SubjectSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subject

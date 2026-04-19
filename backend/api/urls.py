@@ -14,6 +14,8 @@ from .views import (
     LoginAPIView,
     MeAPIView,
     MyServicesAPIView,
+    TutorProfileDetailAPIView,
+    TutorProfileListAPIView,
 
 
 )
@@ -33,5 +35,7 @@ urlpatterns = [
     path('auth/me/', MeAPIView.as_view(), name='auth-me'),
     path('profile/create-service/' , TutorServiceListCreateAPIView.as_view() , name='service-create'),
     path('services/my/', MyServicesAPIView.as_view()),
+    path('tutors/', TutorProfileListAPIView.as_view(), name='tutor-list'),
+    path('tutors/<int:pk>/', TutorProfileDetailAPIView.as_view(), name='tutor-detail'),
 
 ]

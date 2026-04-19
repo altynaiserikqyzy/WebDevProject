@@ -68,58 +68,54 @@ export class TutorsPage {
   private sort: 'newest' | 'price' = 'newest';
 
   constructor(private readonly api: ApiService) {
-    this.loadServices();
+    this.loadTutors();
   }
 
   onSearch(value: string) {
     this.search = value;
-    this.loadServices();
+    this.loadTutors();
   }
 
   onFormat(value: string) {
     this.format = value;
-    this.loadServices();
+    this.loadTutors();
   }
 
   onSort(value: 'newest' | 'price') {
     this.sort = value;
-    this.loadServices();
+    this.loadTutors();
   }
 
-  private loadServices() {
-    this.api.listServices().subscribe({
-      next: (services) => {
+  private loadTutors() {
+    this.api.listTutors().subscribe({
+      next: (profiles) => {
         const normalizedSearch = this.search.trim().toLowerCase();
-        const mapped = services.map((service) => ({
-          id: service.id,
-          userId: service.tutor?.user?.id ?? 0,
-          name: service.tutor?.full_name?.trim() || service.tutor?.user?.username || 'Tutor',
-          username: service.tutor?.user?.username ?? '',
-          subject: service.subject?.name ?? '',
-          title: service.title,
-          description: service.description,
-          price: service.price_per_hour,
-          format: String(service.format ?? '').toLowerCase(),
-          avatar: service.tutor?.avatar || `https://i.pravatar.cc/160?u=${encodeURIComponent(service.tutor?.user?.username ?? service.id)}`,
-          createdAt: service.created_at,
-        }));
+        const mapped = profiles.map((profile) => {
+          const primaryService = profile.services?.[0];
+          const username = profile.user?.username ?? '';
 
-        const deduped = Array.from(
-          new Map(
-            mapped.map((service) => [
-              `${service.username}|${service.subject}|${service.title}|${service.price}|${service.format}|${service.description}`.toLowerCase(),
-              service,
-            ])
-          ).values()
-        );
+          return {
+            id: profile.id,
+            userId: profile.user?.id ?? 0,
+            name: profile.full_name?.trim() || username || 'Tutor',
+            username,
+            subject: primaryService?.subject?.name ?? profile.major ?? '',
+            title: primaryService?.title ?? 'KBTU tutor',
+            description: primaryService?.description ?? profile.bio ?? '',
+            price: primaryService?.price_per_hour ?? '0.00',
+            format: String(primaryService?.format ?? 'online').toLowerCase(),
+            avatar: this.getAvatarUrl(profile.avatar, username || String(profile.id)),
+            createdAt: primaryService?.created_at ?? '',
+          };
+        });
 
         const formatFiltered = this.format
-          ? deduped.filter((service) => service.format === this.format.toLowerCase())
-          : deduped;
+          ? mapped.filter((tutor) => tutor.format === this.format.toLowerCase())
+          : mapped;
 
         const filtered = normalizedSearch
-          ? formatFiltered.filter((service) =>
-              `${service.name} ${service.username} ${service.subject} ${service.title} ${service.description}`
+          ? formatFiltered.filter((tutor) =>
+              `${tutor.name} ${tutor.username} ${tutor.subject} ${tutor.title} ${tutor.description}`
                 .toLowerCase()
                 .includes(normalizedSearch)
             )
@@ -137,5 +133,18 @@ export class TutorsPage {
         this.tutors.set([]);
       },
     });
+  }
+
+  private getAvatarUrl(avatar: string | null | undefined, fallbackKey: string) {
+    if (!avatar) {
+      return `https://i.pravatar.cc/160?u=${encodeURIComponent(fallbackKey)}`;
+    }
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return avatar;
+    }
+    if (avatar.startsWith('/media/http')) {
+      return decodeURIComponent(avatar.replace('/media/', ''));
+    }
+    return `http://127.0.0.1:8000${avatar}`;
   }
 }

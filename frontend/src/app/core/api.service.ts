@@ -74,9 +74,27 @@ export class ApiService {
     bio?: string;
     major?: string;
     study_year?: number;
-    avatar?: string;
+    avatarFile?: File | null;
   }): Observable<any> {
-    return this.http.patch(`${this.baseUrl}/profile/me/`, payload);
+    const formData = new FormData();
+
+    if (payload.full_name !== undefined) {
+      formData.append('full_name', payload.full_name);
+    }
+    if (payload.bio !== undefined) {
+      formData.append('bio', payload.bio);
+    }
+    if (payload.major !== undefined) {
+      formData.append('major', payload.major);
+    }
+    if (payload.study_year !== undefined) {
+      formData.append('study_year', String(payload.study_year));
+    }
+    if (payload.avatarFile) {
+      formData.append('avatar', payload.avatarFile);
+    }
+
+    return this.http.patch(`${this.baseUrl}/profile/me/`, formData);
   }
 
   setTutorStatus(is_tutor: boolean): Observable<any> {
@@ -127,6 +145,12 @@ export class ApiService {
 
   getService(id: number): Observable<any> {
     return this.http.get<any>(`${this.baseUrl}/services/${id}/`);
+  }
+  listTutors(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/tutors/`);
+  }
+  getTutorProfile(id: number): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/tutors/${id}/`);
   }
   getMyServices(): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/services/my/`);

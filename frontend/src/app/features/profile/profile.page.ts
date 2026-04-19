@@ -46,6 +46,9 @@ import { AuthService } from '../../core/auth.service';
             <input [(ngModel)]="fullName" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Full name" />
             <input [(ngModel)]="major" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Major" />
             <input [(ngModel)]="studyYear" type="number" min="1" max="6" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Study year" />
+            <label class="cursor-pointer rounded-xl border border-white/20 bg-slate-900 px-4 py-3 text-center text-sm text-slate-200 hover:border-brand-300">
+            {{ selectedAvatarFile?.name || 'Choose avatar image' }}
+            <input type="file" accept="image/*" (change)="onAvatarSelected($event)"  class="hidden"  /> </label>
             <textarea [(ngModel)]="bio" rows="4" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3 md:col-span-2" placeholder="Bio"></textarea>
             @if (error()) {
               <p class="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 md:col-span-2">{{ error() }}</p>
@@ -144,6 +147,7 @@ export class ProfilePage {
   bio = '';
   major = '';
   studyYear = 1;
+  selectedAvatarFile: File | null = null;
   readonly myServices = signal<Array<any>>([]);
 
   constructor(
@@ -177,6 +181,11 @@ export class ProfilePage {
     }
   });
 }
+  onAvatarSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    this.selectedAvatarFile = input.files?.[0] ?? null;
+  }
+
   save() {
     const fullName = this.fullName.trim();
     const major = this.major.trim();
@@ -199,9 +208,11 @@ export class ProfilePage {
       bio,
       major,
       studyYear,
+      avatarFile: this.selectedAvatarFile,
     }, () => {
       this.saving.set(false);
       this.editing = false;
+      this.selectedAvatarFile = null;
     }, (message) => {
       this.saving.set(false);
       this.error.set(message);
@@ -230,6 +241,7 @@ export class ProfilePage {
     this.bio = user.bio;
     this.major = user.major;
     this.studyYear = user.studyYear;
+    this.selectedAvatarFile = null;
     this.error.set('');
   }
 

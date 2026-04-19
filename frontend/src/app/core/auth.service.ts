@@ -104,7 +104,7 @@ export class AuthService {
   }
 
   updateProfile(
-    payload: { fullName: string; bio: string; major: string; studyYear: number },
+    payload: { fullName: string; bio: string; major: string; studyYear: number; avatarFile?: File | null },
     onDone?: () => void,
     onError?: (message: string) => void
   ) {
@@ -113,6 +113,7 @@ export class AuthService {
       bio: payload.bio,
       major: payload.major,
       study_year: payload.studyYear,
+      avatarFile: payload.avatarFile,
     }).subscribe({
       next: (profile) => {
         this.userState.set(this.mapProfileToUser(profile));
@@ -156,9 +157,22 @@ export class AuthService {
       bio: profile.bio ?? '',
       major: profile.major ?? '',
       studyYear: profile.study_year ?? 1,
-      avatar: profile.avatar || `https://i.pravatar.cc/160?u=${encodeURIComponent(profile.user.username)}`,
+      avatar: this.getAvatarUrl(profile.avatar, profile.user.username),
       isTutor: profile.is_tutor,
     };
+  }
+
+  private getAvatarUrl(avatar: string, username: string) {
+    if (!avatar) {
+      return `https://i.pravatar.cc/160?u=${encodeURIComponent(username)}`;
+    }
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return avatar;
+    }
+    if (avatar.startsWith('/media/http')) {
+      return decodeURIComponent(avatar.replace('/media/', ''));
+    }
+    return `http://127.0.0.1:8000${avatar}`;
   }
 
   private extractErrorMessage(err: any, fallback: string) {

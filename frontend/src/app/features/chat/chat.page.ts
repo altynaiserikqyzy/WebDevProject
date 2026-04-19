@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 
@@ -11,8 +11,8 @@ import { ChatPreview, ChatViewMessage, UserSearchResult } from '../../core/model
   imports: [FormsModule],
   template: `
     <section class="section-wrap">
-      <div class="grid h-[75vh] gap-4" [class]="activeThread ? 'grid-cols-1' : 'lg:grid-cols-[320px,1fr]'">
-        @if (!activeThread) {
+      <div class="grid h-[75vh] gap-4" [class]="activeThread() ? 'grid-cols-1' : 'lg:grid-cols-[320px,1fr]'">
+        @if (!activeThread()) {
           <aside class="glass flex flex-col gap-4 rounded-2xl p-4">
             <div>
               <p class="text-sm uppercase tracking-widest text-brand-200">Conversations</p>
@@ -37,7 +37,7 @@ import { ChatPreview, ChatViewMessage, UserSearchResult } from '../../core/model
                 </p>
               }
               <div class="mt-3 max-h-44 space-y-2 overflow-y-auto">
-                @for (user of foundUsers; track user.id) {
+                @for (user of foundUsers(); track user.id) {
                   <button class="w-full rounded-xl border border-white/10 bg-slate-900/80 p-3 text-left transition hover:bg-slate-800" (click)="openChatWith(user)">
                     <p class="font-medium">{{ user.fullName }}</p>
                     <p class="text-xs text-slate-400">@{{ user.username }} · {{ user.email }}</p>
@@ -71,19 +71,19 @@ import { ChatPreview, ChatViewMessage, UserSearchResult } from '../../core/model
           </aside>
         }
 
-        <article class="glass flex rounded-2xl p-4" [class]="activeThread ? 'glass flex min-h-[75vh] rounded-2xl p-4' : 'glass flex rounded-2xl p-4'">
-          @if (activeThread) {
+          <article class="glass flex rounded-2xl p-4" [class]="activeThread() ? 'glass flex min-h-[75vh] rounded-2xl p-4' : 'glass flex rounded-2xl p-4'">
+          @if (activeThread(); as thread) {
             <div class="flex w-full flex-col">
               <div class="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
                 <div>
-                  <p class="text-lg font-semibold">{{ activeThread.otherUser.fullName }}</p>
-                  <p class="text-sm text-slate-400">@{{ activeThread.otherUser.username }} · {{ activeThread.otherUser.email }}</p>
+                  <p class="text-lg font-semibold">{{ thread.otherUser.fullName }}</p>
+                  <p class="text-sm text-slate-400">@{{ thread.otherUser.username }} · {{ thread.otherUser.email }}</p>
                 </div>
                 <button class="rounded-xl border border-white/10 px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-900" (click)="closeThread()">X</button>
               </div>
 
               <div class="flex-1 space-y-3 overflow-y-auto py-4">
-                @for (message of activeMessages; track message.id) {
+                @for (message of activeMessages(); track message.id) {
                   <div [class]="message.isMine ? 'ml-auto w-fit max-w-[80%] rounded-2xl bg-brand-500 px-4 py-2' : 'w-fit max-w-[80%] rounded-2xl bg-slate-800 px-4 py-2'">
                     <p>{{ message.text }}</p>
                     <p class="mt-1 text-[11px] opacity-70">{{ formatDate(message.createdAt) }}</p>
@@ -118,17 +118,22 @@ export class ChatPage {
   threadSearch = '';
   userSearch = '';
   draft = '';
-  foundUsers: UserSearchResult[] = [];
-  threads: ChatPreview[] = [];
-  activeThread: ChatPreview | null = null;
-  activeMessages: ChatViewMessage[] = [];
+  readonly foundUsers = signal<UserSearchResult[]>([]);
+  readonly threads = signal<ChatPreview[]>([]);
+  readonly activeThread = signal<ChatPreview | null>(null);
+  readonly activeMessages = signal<ChatViewMessage[]>([]);
 
   constructor(
     public readonly auth: AuthService,
     private readonly api: ApiService,
     private readonly route: ActivatedRoute
   ) {
-    this.loadConversations();
+    if (this.auth.user()) {
+      this.loadConversations();
+    } else {
+      this.auth.loadProfile(() => this.loadConversations());
+    }
+
     this.route.queryParamMap.subscribe((params) => {
       const userId = Number(params.get('userId'));
       if (userId) {
@@ -145,7 +150,7 @@ export class ChatPage {
 
   filteredThreads() {
     const query = this.threadSearch.trim().toLowerCase();
-    return this.threads.filter((thread) => {
+    return this.threads().filter((thread) => {
       if (!query) {
         return true;
       }
@@ -156,22 +161,22 @@ export class ChatPage {
   refreshUserSearch() {
     const query = this.userSearch.trim();
     if (!query) {
-      this.foundUsers = [];
+      this.foundUsers.set([]);
       return;
     }
 
     this.api.searchUsers(query).subscribe({
       next: (users) => {
-        this.foundUsers = users.map((user) => ({
+        this.foundUsers.set(users.map((user) => ({
           id: user.id,
           username: user.username,
           email: user.email,
           fullName: user.full_name || user.username,
           avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(user.username)}`,
-        }));
+        })));
       },
       error: () => {
-        this.foundUsers = [];
+        this.foundUsers.set([]);
       },
     });
   }
@@ -179,36 +184,40 @@ export class ChatPage {
   openChatWith(user: UserSearchResult) {
     this.api.startConversation(user.id).subscribe({
       next: (conversation) => {
-        this.activeThread = this.mapConversationToThread(conversation);
+        this.activeThread.set(this.mapConversationToThread(conversation, user.id, user));
         this.loadMessages(conversation.id);
         this.loadConversations();
+      },
+      error: (err) => {
+        console.error('Failed to open chat:', err);
       },
     });
   }
 
   selectThread(threadId: number) {
-    const thread = this.threads.find((item) => item.id === threadId) ?? null;
-    this.activeThread = thread;
+    const thread = this.threads().find((item) => item.id === threadId) ?? null;
+    this.activeThread.set(thread);
     if (thread) {
       this.loadMessages(thread.id);
     }
   }
 
   closeThread() {
-    this.activeThread = null;
-    this.activeMessages = [];
+    this.activeThread.set(null);
+    this.activeMessages.set([]);
     this.draft = '';
   }
 
   send() {
-    if (!this.activeThread || !this.draft.trim()) {
+    const thread = this.activeThread();
+    if (!thread || !this.draft.trim()) {
       return;
     }
 
-    this.api.sendConversationMessage(this.activeThread.id, this.draft).subscribe({
+    this.api.sendConversationMessage(thread.id, this.draft).subscribe({
       next: () => {
         this.draft = '';
-        this.loadMessages(this.activeThread!.id);
+        this.loadMessages(thread.id);
         this.loadConversations();
       },
     });
@@ -225,13 +234,16 @@ export class ChatPage {
   private loadConversations() {
     this.api.listConversations().subscribe({
       next: (conversations) => {
-        this.threads = conversations.map((conversation) => this.mapConversationToThread(conversation));
-        if (this.activeThread) {
-          this.activeThread = this.threads.find((thread) => thread.id === this.activeThread?.id) ?? this.activeThread;
+        const threads = conversations.map((conversation) => this.mapConversationToThread(conversation));
+        this.threads.set(threads);
+
+        const activeThread = this.activeThread();
+        if (activeThread) {
+          this.activeThread.set(threads.find((thread) => thread.id === activeThread.id) ?? activeThread);
         }
       },
       error: () => {
-        this.threads = [];
+        this.threads.set([]);
       },
     });
   }
@@ -240,24 +252,27 @@ export class ChatPage {
     this.api.getConversationMessages(conversationId).subscribe({
       next: (messages) => {
         const currentUserId = this.auth.user()?.id;
-        this.activeMessages = messages.map((message) => ({
+        this.activeMessages.set(messages.map((message) => ({
           id: message.id,
           senderId: message.sender?.id ?? 0,
           text: message.text,
           createdAt: message.created_at,
           isMine: message.sender?.id === currentUserId,
-        }));
+        })));
       },
       error: () => {
-        this.activeMessages = [];
+        this.activeMessages.set([]);
       },
     });
   }
 
-  private mapConversationToThread(conversation: any): ChatPreview {
+  private mapConversationToThread(conversation: any, preferredUserId?: number, fallbackUser?: UserSearchResult): ChatPreview {
     const currentUserId = this.auth.user()?.id;
-    const otherParticipant = (conversation.participants ?? []).find((participant: any) => participant.user?.id !== currentUserId);
-    const otherUser = otherParticipant?.user ?? { id: 0, username: 'Unknown', email: '' };
+    const participants = conversation.participants ?? [];
+    const otherParticipant = preferredUserId
+      ? participants.find((participant: any) => participant.user?.id === preferredUserId)
+      : participants.find((participant: any) => participant.user?.id !== currentUserId);
+    const otherUser = otherParticipant?.user ?? fallbackUser ?? { id: 0, username: 'Unknown', email: '', full_name: 'Unknown' };
 
     return {
       id: conversation.id,
@@ -265,7 +280,7 @@ export class ChatPage {
         id: otherUser.id,
         username: otherUser.username,
         email: otherUser.email,
-        fullName: otherUser.full_name || otherUser.username,
+        fullName: otherUser.full_name || otherUser.fullName || otherUser.username,
         avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(otherUser.username)}`,
       },
       lastMessage: conversation.last_message?.text ?? 'Start your conversation.',
