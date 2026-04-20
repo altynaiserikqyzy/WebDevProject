@@ -28,16 +28,8 @@ import { AuthService } from '../../core/auth.service';
 
         <div class="grid gap-4 md:grid-cols-3">
           <article class="glass p-4">
-            <p class="text-sm text-slate-300">Registered chats</p>
-            <p class="text-2xl font-bold">Backend</p>
-          </article>
-          <article class="glass p-4">
             <p class="text-sm text-slate-300">Account type</p>
             <p class="text-2xl font-bold">{{ user.isTutor ? 'Tutor' : 'Student' }}</p>
-          </article>
-          <article class="glass p-4">
-            <p class="text-sm text-slate-300">Stored locally</p>
-            <p class="text-2xl font-bold">Frontend</p>
           </article>
         </div>
 
