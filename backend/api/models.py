@@ -54,52 +54,64 @@ class TutorService(models.Model):
     format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default=FORMAT_ONLINE)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f'{self.title} - {self.tutor.full_name}'
 
 
-class Conversation(models.Model):
+class TutorAvailabilitySlot(models.Model):
+    FORMAT_ONLINE = 'online'
+    FORMAT_OFFLINE = 'offline'
+    FORMAT_BOTH = 'both'
+
+    FORMAT_CHOICES = [
+        (FORMAT_ONLINE, 'Online'),
+        (FORMAT_OFFLINE, 'Offline'),
+        (FORMAT_BOTH, 'Both'),
+    ]
+
+    tutor_service = models.ForeignKey(
+        TutorService,
+        on_delete=models.CASCADE,
+        related_name='slots'
+    )
+    date = models.DateField()
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default=FORMAT_ONLINE)
+    is_booked = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f'Conversation #{self.id}'
-
-
-class ConversationParticipant(models.Model):
-    conversation = models.ForeignKey(
-        Conversation,
-        on_delete=models.CASCADE,
-        related_name='participants'
-    )
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='chat_participations'
-    )
-    joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('conversation', 'user')
+        ordering = ['date', 'start_time']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tutor_service', 'date', 'start_time', 'end_time', 'format'],
+                name='unique_tutor_service_slot'
+            )
+        ]
 
     def __str__(self):
-        return f'{self.user.username} in chat {self.conversation_id}'
+        return f'{self.tutor_service_id}: {self.date} {self.start_time}-{self.end_time}'
 
 
-class Message(models.Model):
-    conversation = models.ForeignKey(
-        Conversation,
+class TutorReview(models.Model):
+    tutor = models.ForeignKey(
+        Profile,
         on_delete=models.CASCADE,
-        related_name='messages'
+        related_name='reviews'
     )
-    sender = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='sent_messages'
-    )
-    text = models.TextField()
+    reviewer_name = models.CharField(max_length=255)
+    reviewer_major = models.CharField(max_length=255, blank=True)
+    rating = models.PositiveSmallIntegerField()
+    comment = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-created_at']
+
     def __str__(self):
-        return f'Message from {self.sender.username} in chat {self.conversation_id}'
+        return f'{self.reviewer_name} -> {self.tutor_id} ({self.rating})'
+
+

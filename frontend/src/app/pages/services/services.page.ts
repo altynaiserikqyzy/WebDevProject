@@ -127,7 +127,7 @@ export class ServicesPage {
   }
 
   onTutorCardClick(tutorId: number) {
-    this.router.navigateByUrl(`/tutor/${tutorId}`);
+    this.router.navigateByUrl(`/tutors/${tutorId}`);
   }
 
   toggleCreateForm() {

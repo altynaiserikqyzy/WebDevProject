@@ -1,4 +1,4 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { PlatformService } from '../../core/platform.service';
@@ -8,49 +8,96 @@ import { PlatformService } from '../../core/platform.service';
   imports: [RouterLink],
   template: `
     <section class="section-wrap space-y-8">
-      <div class="glass p-6">
-        <h1 class="text-3xl font-bold">Explore tutors and subjects</h1>
-        <input class="mt-4 w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Search tutor or subject..." [value]="query()" (input)="query.set(($any($event.target).value || '').toLowerCase())" />
+      <div class="rounded-3xl border border-[#c2b99d] bg-[#EEE9D2] px-8 py-6">
+        <h1 class="text-3xl font-bold text-[#1f4e34]">Find tutors by disciplines</h1>
       </div>
       <div class="grid gap-4 md:grid-cols-3">
         @for (subject of platform.subjects(); track subject.id) {
-          <a routerLink="/tutors" class="glass block rounded-2xl p-5 transition hover:-translate-y-1">
-            <p class="text-2xl">{{ subject.icon }}</p>
-            <h3 class="mt-2 font-semibold text-white">{{ subject.name }}</h3>
+          <a
+            routerLink="/tutors"
+            class="glass subject-card block rounded-2xl p-5 transition hover:-translate-y-1"
+            [class.subject-card-calculus]="subject.name === 'Calculus |'"
+            [class.subject-card-linear-algebra]="subject.name === 'Linear Algebra for Engineers'"
+            [class.subject-card-theoretical-mechanics]="subject.name === 'Theoretical Mechanics'"
+            [class.subject-card-programming]="subject.name === 'Programming Principles |'"
+            [class.subject-card-statistics]="subject.name === 'Statistics'"
+            [class.subject-card-accounting]="subject.name === 'Accounting'"
+          >
+            <h3 class="subject-title mt-1 font-semibold text-white">{{ subject.name }}</h3>
           </a>
         }
       </div>
-      <div>
-        <h2 class="text-xl font-semibold">Featured tutors</h2>
-        <div class="mt-4 grid gap-4 md:grid-cols-2">
-          @for (tutor of filteredTutors(); track tutor.id) {
-            <article class="glass rounded-2xl p-5">
-              <div class="flex items-center gap-3">
-                <img [src]="tutor.avatar" [alt]="tutor.name" class="h-14 w-14 rounded-full object-cover" />
-                <div>
-                  <h3 class="font-semibold">{{ tutor.name }}</h3>
-                  <p class="text-sm text-slate-300">{{ tutor.service.title }}</p>
-                </div>
-              </div>
-              <div class="mt-4 flex items-center justify-between">
-                <span class="text-sm text-brand-200">★ {{ tutor.rating }} · {{ tutor.responseSpeed }}</span>
-                <a [routerLink]="['/tutors', tutor.id]" class="btn-secondary px-4 py-2 text-sm">View Profile</a>
-              </div>
-            </article>
-          }
-        </div>
-      </div>
     </section>
-  `
+  `,
+  styles: [`
+    .subject-card {
+      min-height: 132px;
+      position: relative;
+      overflow: hidden;
+      border: 2px solid #FBF9E4;
+      box-shadow: none;
+    }
+
+    .subject-card-calculus {
+      background-image:
+        linear-gradient(180deg, rgba(3, 7, 27, 0.26) 0%, rgba(3, 7, 27, 0.68) 100%),
+        url('/calculus-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      box-shadow: inset 0 0 0 1px rgba(251, 249, 228, 0.10);
+    }
+
+    .subject-card-linear-algebra {
+      background-image:
+        linear-gradient(180deg, rgba(3, 7, 27, 0.30) 0%, rgba(3, 7, 27, 0.72) 100%),
+        url('/linear-algebra-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      box-shadow: inset 0 0 0 1px rgba(251, 249, 228, 0.10);
+    }
+
+    .subject-card-programming {
+      background-image:
+        linear-gradient(180deg, rgba(3, 7, 27, 0.28) 0%, rgba(3, 7, 27, 0.72) 100%),
+        url('/programming-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      box-shadow: inset 0 0 0 1px rgba(251, 249, 228, 0.10);
+    }
+
+    .subject-card-theoretical-mechanics {
+      background-image:
+        linear-gradient(180deg, rgba(3, 7, 27, 0.30) 0%, rgba(3, 7, 27, 0.72) 100%),
+        url('/theoretical-mechanics-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      box-shadow: inset 0 0 0 1px rgba(251, 249, 228, 0.10);
+    }
+
+    .subject-card-statistics {
+      background-image:
+        linear-gradient(180deg, rgba(3, 7, 27, 0.34) 0%, rgba(3, 7, 27, 0.72) 100%),
+        url('/statistics-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      box-shadow: inset 0 0 0 1px rgba(251, 249, 228, 0.10);
+    }
+
+    .subject-card-accounting {
+      background-image:
+        linear-gradient(180deg, rgba(3, 7, 27, 0.34) 0%, rgba(3, 7, 27, 0.72) 100%),
+        url('/accounting-bg.jpg');
+      background-size: cover;
+      background-position: center;
+      box-shadow: inset 0 0 0 1px rgba(251, 249, 228, 0.10);
+    }
+
+    .subject-title {
+      position: relative;
+      z-index: 1;
+    }
+  `],
 })
 export class ExplorePage {
-  readonly query = signal('');
-  readonly filteredTutors = computed(() =>
-    this.platform
-      .tutors()
-      .filter((t) => `${t.name} ${t.service.title}`.toLowerCase().includes(this.query()))
-      .slice(0, 4)
-  );
-
   constructor(public readonly platform: PlatformService) {}
 }

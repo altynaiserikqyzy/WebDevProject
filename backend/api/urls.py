@@ -1,36 +1,36 @@
 from django.urls import path
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
-    ConversationMessagesAPIView,
-    MyConversationListAPIView,
     MyProfileAPIView,
-    StartConversationAPIView,
     SubjectListAPIView,
     TutorServiceDetailAPIView,
     TutorServiceListCreateAPIView,
     TutorStatusAPIView,
-    UserSearchAPIView,
     SignupAPIView,
     LoginAPIView,
     MeAPIView,
     MyServicesAPIView,
     TutorProfileDetailAPIView,
     TutorProfileListAPIView,
+    TutorServiceSlotCreateAPIView,
 
 
 )
 
 urlpatterns = [
     path('auth/signup/', SignupAPIView.as_view(), name='auth-signup'),
+    path('auth/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
     path('subjects/', SubjectListAPIView.as_view(), name='subject-list'),
     path('services/', TutorServiceListCreateAPIView.as_view(), name='service-list-create'),
     path('services/<int:pk>/', TutorServiceDetailAPIView.as_view(), name='service-detail'),
+    path('services/<int:pk>/slots/', TutorServiceSlotCreateAPIView.as_view(), name='service-slot-create'),
+    path('tutor-services/', TutorServiceListCreateAPIView.as_view(), name='tutor-service-list-create'),
+    path('tutor-services/<int:pk>/', TutorServiceDetailAPIView.as_view(), name='tutor-service-detail'),
+    path('tutor-services/<int:pk>/slots/', TutorServiceSlotCreateAPIView.as_view(), name='tutor-service-slot-create'),
+    path('my-tutor-services/', MyServicesAPIView.as_view(), name='my-tutor-services'),
     path('profile/me/', MyProfileAPIView.as_view(), name='my-profile'),
     path('profile/tutor-status/', TutorStatusAPIView.as_view(), name='tutor-status'),
-    path('users/search/', UserSearchAPIView.as_view(), name='user-search'),
-    path('conversations/', MyConversationListAPIView.as_view(), name='conversation-list'),
-    path('conversations/start/', StartConversationAPIView.as_view(), name='conversation-start'),
-    path('conversations/<int:conversation_id>/messages/', ConversationMessagesAPIView.as_view(), name='conversation-messages'),
     path('auth/login/', LoginAPIView.as_view(), name='auth-login'),
     path('auth/me/', MeAPIView.as_view(), name='auth-me'),
     path('profile/create-service/' , TutorServiceListCreateAPIView.as_view() , name='service-create'),

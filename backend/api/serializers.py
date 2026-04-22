@@ -1,7 +1,8 @@
 from django.contrib.auth.models import User
+from django.db import transaction
 from rest_framework import serializers
 
-from .models import Conversation, ConversationParticipant, Message, Profile, Subject, TutorService
+from .models import Profile, Subject, TutorAvailabilitySlot, TutorReview, TutorService
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -43,17 +44,67 @@ class SubjectSerializer(serializers.ModelSerializer):
         model = Subject
         fields = ['id', 'name']
 
+
+class TutorAvailabilitySlotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TutorAvailabilitySlot
+        fields = [
+            'id',
+            'date',
+            'start_time',
+            'end_time',
+            'format',
+            'is_booked',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'is_booked', 'created_at']
+
+    def validate(self, attrs):
+        start_time = attrs.get('start_time')
+        end_time = attrs.get('end_time')
+        if start_time and end_time and start_time >= end_time:
+            raise serializers.ValidationError({'end_time': 'End time must be later than start time.'})
+        return attrs
+
+
+class TutorAvailabilitySlotCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TutorAvailabilitySlot
+        fields = ['id', 'date', 'start_time', 'end_time', 'format']
+        read_only_fields = ['id']
+
+    def validate(self, attrs):
+        start_time = attrs.get('start_time')
+        end_time = attrs.get('end_time')
+        if start_time and end_time and start_time >= end_time:
+            raise serializers.ValidationError({'end_time': 'End time must be later than start time.'})
+        return attrs
+
+
+class TutorReviewSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TutorReview
+        fields = ['id', 'reviewer_name', 'reviewer_major', 'rating', 'comment', 'created_at']
+
+    def validate_rating(self, value):
+        if value < 1 or value > 5:
+            raise serializers.ValidationError('Rating must be between 1 and 5.')
+        return value
+
+
 class TutorServiceSerializer(serializers.ModelSerializer):
     tutor = ProfileSerializer(read_only=True)
     subject = SubjectSerializer(read_only=True)
+    subject_name = serializers.SerializerMethodField(read_only=True)
+    service_title = serializers.CharField(source='title', required=False, allow_blank=False)
     subject_id = serializers.PrimaryKeyRelatedField(
         queryset=Subject.objects.all(),
         source='subject',
         write_only=True,
-        required=False,
-        allow_null=True,
+        required=True,
     )
-    subject_name = serializers.CharField(write_only=True, required=False, allow_blank=False)
+    slots = TutorAvailabilitySlotCreateSerializer(many=True, write_only=True, required=False)
+    availability_slots = TutorAvailabilitySlotSerializer(many=True, source='slots', read_only=True)
 
     class Meta:
         model = TutorService
@@ -61,74 +112,107 @@ class TutorServiceSerializer(serializers.ModelSerializer):
             'id',
             'tutor',
             'subject',
-            'subject_id',
             'subject_name',
+            'subject_id',
+            'service_title',
             'title',
             'description',
             'price_per_hour',
             'format',
             'is_active',
             'created_at',
+            'updated_at',
+            'availability_slots',
+            'slots',
         ]
+        read_only_fields = ['id', 'tutor', 'subject', 'title', 'created_at', 'updated_at', 'availability_slots']
 
     def validate(self, attrs):
-        subject = attrs.get('subject')
-        subject_name = self.initial_data.get('subject_name', '')
+        title = attrs.get('title')
+        if not title:
+            legacy_title = str(self.initial_data.get('title', '')).strip()
+            if legacy_title:
+                attrs['title'] = legacy_title
+            else:
+                raise serializers.ValidationError({'service_title': 'Service title is required.'})
 
-        if not subject and not str(subject_name).strip():
-            raise serializers.ValidationError({'subject_name': 'Select a subject or enter one manually.'})
+        price_per_hour = attrs.get('price_per_hour')
+        if price_per_hour is not None and price_per_hour <= 0:
+            raise serializers.ValidationError({'price_per_hour': 'Price per hour must be greater than 0.'})
 
+        slots = attrs.get('slots', [])
+        if slots:
+            keys = set()
+            for slot_data in slots:
+                key = (
+                    slot_data['date'],
+                    slot_data['start_time'],
+                    slot_data['end_time'],
+                    slot_data['format'],
+                )
+                if key in keys:
+                    raise serializers.ValidationError({'slots': 'Duplicate slots are not allowed for one service.'})
+                keys.add(key)
         return attrs
 
+    def get_subject_name(self, obj):
+        return obj.subject.name
+
     def create(self, validated_data):
-        subject_name = str(validated_data.pop('subject_name', self.initial_data.get('subject_name', ''))).strip()
-        subject = validated_data.get('subject')
-
-        if subject is None:
-            subject, _ = Subject.objects.get_or_create(name=subject_name)
-            validated_data['subject'] = subject
-
-        return super().create(validated_data)
-
-class ConversationParticipantSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-
-    class Meta:
-        model = ConversationParticipant
-        fields = ['id', 'user', 'joined_at']
+        slots_data = validated_data.pop('slots', [])
+        with transaction.atomic():
+            service = super().create(validated_data)
+            if slots_data:
+                TutorAvailabilitySlot.objects.bulk_create(
+                    [TutorAvailabilitySlot(tutor_service=service, **slot_data) for slot_data in slots_data]
+                )
+        return service
 
 
-class MessageSerializer(serializers.ModelSerializer):
-    sender = UserSerializer(read_only=True)
 
-    class Meta:
-        model = Message
-        fields = ['id', 'conversation', 'sender', 'text', 'created_at']
-        read_only_fields = ['sender', 'created_at', 'conversation']
-
-
-class ConversationSerializer(serializers.ModelSerializer):
-    participants = ConversationParticipantSerializer(many=True, read_only=True)
-    last_message = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Conversation
-        fields = ['id', 'participants', 'last_message', 'created_at', 'updated_at']
-
-    def get_last_message(self, obj):
-        last_message = obj.messages.order_by('-created_at').first()
-        if not last_message:
-            return None
-        return MessageSerializer(last_message).data
 class SignupSerializer(serializers.Serializer):
     username = serializers.CharField(required=True)
     full_name = serializers.CharField(required=True)
     email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, min_length=8)
+
+    def validate_username(self, value):
+        username = value.strip()
+        if not username:
+            raise serializers.ValidationError('Username is required.')
+        if User.objects.filter(username__iexact=username).exists():
+            raise serializers.ValidationError('Username already exists.')
+        return username
+
     def validate_email(self, value):
-        if not value.endswith('@kbtu.kz'):
+        email = value.strip().lower()
+        if not email.endswith('@kbtu.kz'):
             raise serializers.ValidationError('Only KBTU email addresses are allowed.')
-        return value
+        if User.objects.filter(email__iexact=email).exists():
+            raise serializers.ValidationError('Email already exists.')
+        return email
+
+    def create(self, validated_data):
+        with transaction.atomic():
+            user = User(
+                username=validated_data['username'],
+                email=validated_data['email'],
+            )
+            user.set_password(validated_data['password'])
+            user.save()
+
+            Profile.objects.create(
+                user=user,
+                full_name=validated_data['full_name'].strip() or user.username,
+            )
+        return user
+
 class LoginSerializer(serializers.Serializer):
-    username = serializers.CharField(required=True)
+    email = serializers.EmailField(required=True)
     password = serializers.CharField(write_only=True, required=True)
+
+    def validate_email(self, value):
+        email = value.strip().lower()
+        if not email.endswith('@kbtu.kz'):
+            raise serializers.ValidationError('Use your KBTU email (@kbtu.kz).')
+        return email

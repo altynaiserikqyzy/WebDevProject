@@ -25,10 +25,10 @@ import { AuthService } from '../../core/auth.service';
         <form class="space-y-4" (ngSubmit)="submit()">
           @if (tab() === 'signup') {
             <input [(ngModel)]="fullName" name="fullName" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Full name" required />
+            <input [(ngModel)]="username" name="username" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Username" required />
           }
-          <input [(ngModel)]="username" name="username" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Username" required />
-          <input [(ngModel)]="email" name="email" type="email" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Email" [required]="tab() === 'signup'" />
-          <input [(ngModel)]="password" name="password" type="password" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Password" required minlength="6" />
+          <input [(ngModel)]="email" name="email" type="email" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="KBTU email (@kbtu.kz)" required />
+          <input [(ngModel)]="password" name="password" type="password" class="w-full rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Password (min 8 chars)" required minlength="8" />
           <button class="btn-primary w-full disabled:cursor-not-allowed disabled:opacity-60" [disabled]="submitting()">
             {{ submitting() ? 'Please wait...' : (tab() === 'login' ? 'Login' : 'Create Account') }}
           </button>
@@ -75,7 +75,7 @@ export class AuthPage {
       });
     } else {
       this.auth.login({
-        username: this.username,
+        email: this.email,
         password: this.password,
       }, {
         next: () => this.openProfile(),

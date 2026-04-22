@@ -1,13 +1,12 @@
 <div class="min-h-screen">
   <header class="sticky top-0 z-40 border-b border-white/10 bg-slate-950/85 backdrop-blur-xl">
     <nav class="section-wrap flex items-center justify-between py-4">
-      <a routerLink="/" class="text-lg font-bold tracking-wide text-white">NoRetake KBTU</a>
-      <div class="hidden items-center gap-6 text-sm text-slate-300 md:flex">
-        <a routerLink="/explore" routerLinkActive="text-brand-100" class="transition hover:text-white">Explore</a>
-        <a routerLink="/tutors" routerLinkActive="text-brand-100" class="transition hover:text-white">Tutors</a>
-        <a routerLink="/calendar" routerLinkActive="text-brand-100" class="transition hover:text-white">Calendar</a>
-        <a routerLink="/chat" routerLinkActive="text-brand-100" class="transition hover:text-white">Chat</a>
-        <a routerLink="/profile" routerLinkActive="text-brand-100" class="transition hover:text-white">Profile</a>
+      <a routerLink="/" class="text-lg font-bold tracking-wide text-[#FBF9E4]">NoRetake KBTU</a>
+      <div class="hidden items-center gap-6 text-sm text-[#FBF9E4] md:flex">
+        <a routerLink="/explore" routerLinkActive="text-[#FBF9E4]" class="transition hover:text-[#FBF9E4]">Explore</a>
+        <a routerLink="/tutors" routerLinkActive="text-[#FBF9E4]" class="transition hover:text-[#FBF9E4]">Tutors</a>
+        <a routerLink="/calendar" routerLinkActive="text-[#FBF9E4]" class="transition hover:text-[#FBF9E4]">Calendar</a>
+        <a routerLink="/profile" routerLinkActive="text-[#FBF9E4]" class="transition hover:text-[#FBF9E4]">Profile</a>
       </div>
       <div class="flex items-center gap-2">
         @if (!auth.isLoggedIn()) {

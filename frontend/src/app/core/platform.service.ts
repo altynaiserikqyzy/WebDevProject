@@ -1,16 +1,16 @@
 import { Injectable, computed, signal } from '@angular/core';
 
-import { Booking, ChatThread, Message, Review, Subject, TutorProfile, TutorService } from './models';
+import { Booking, Review, Subject, TutorProfile, TutorService } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class PlatformService {
   readonly subjects = signal<Subject[]>([
-    { id: 1, name: 'Calculus', icon: '∫' },
-    { id: 2, name: 'Linear Algebra', icon: 'A' },
-    { id: 3, name: 'Physics', icon: 'F' },
-    { id: 4, name: 'Programming', icon: '</>' },
+    { id: 1, name: 'Calculus |', icon: '∫' },
+    { id: 2, name: 'Linear Algebra for Engineers', icon: 'A' },
+    { id: 3, name: 'Theoretical Mechanics', icon: 'F' },
+    { id: 4, name: 'Programming Principles |', icon: '</>' },
     { id: 5, name: 'Statistics', icon: 'σ' },
-    { id: 6, name: 'Economics', icon: '$' }
+    { id: 6, name: 'Accounting', icon: '$' }
   ]);
 
   readonly tutors = signal<TutorProfile[]>([
@@ -85,16 +85,6 @@ export class PlatformService {
     }
   ]);
 
-  readonly chatThreads = signal<ChatThread[]>([
-    { id: 1, tutorId: 1, tutorName: 'Dias Nurbolov', avatar: 'https://i.pravatar.cc/64?img=12', lastMessage: 'Let us focus on derivatives today.', updatedAt: '10:20' },
-    { id: 2, tutorId: 2, tutorName: 'Aigerim Omarova', avatar: 'https://i.pravatar.cc/64?img=32', lastMessage: 'Share your assignment screenshot.', updatedAt: 'Yesterday' }
-  ]);
-
-  readonly messages = signal<Message[]>([
-    { id: 1, threadId: 1, sender: 'tutor', content: 'Hi! Ready for Sunday session?', time: '10:12' },
-    { id: 2, threadId: 1, sender: 'me', content: 'Yes, I need help with integration tasks.', time: '10:14' }
-  ]);
-
   readonly upcomingSessions = computed(() => this.bookings().filter((booking) => booking.status !== 'cancelled'));
 
   addBooking(booking: Omit<Booking, 'id' | 'status'>) {
@@ -123,7 +113,4 @@ export class PlatformService {
     ]);
   }
 
-  sendMessage(threadId: number, content: string) {
-    this.messages.update((items) => [...items, { id: Date.now(), threadId, sender: 'me', content, time: 'Now' }]);
-  }
 }

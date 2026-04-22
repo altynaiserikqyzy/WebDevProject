@@ -37,8 +37,8 @@ export class AuthService {
           email: response.user.email,
           bio: '',
           major: '',
-          studyYear: 1,
-          avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(response.user.username)}`,
+          studyYear: null,
+          avatar: '',
           isTutor: false,
         });
         handlers.next();
@@ -66,8 +66,8 @@ export class AuthService {
           email: response.email,
           bio: '',
           major: '',
-          studyYear: 1,
-          avatar: `https://i.pravatar.cc/160?u=${encodeURIComponent(response.username)}`,
+          studyYear: null,
+          avatar: '',
           isTutor: false,
         });
         handlers.next();
@@ -104,7 +104,7 @@ export class AuthService {
   }
 
   updateProfile(
-    payload: { fullName: string; bio: string; major: string; studyYear: number; avatarFile?: File | null },
+    payload: { fullName: string; bio: string; major: string; studyYear: number | null; avatarFile?: File | null },
     onDone?: () => void,
     onError?: (message: string) => void
   ) {
@@ -120,6 +120,12 @@ export class AuthService {
         onDone?.();
       },
       error: (err) => {
+        const detail = String(err?.error?.detail ?? '').toLowerCase();
+        if (err?.status === 401 || detail.includes('token not valid')) {
+          this.logout();
+          onError?.('Session expired. Please log in again.');
+          return;
+        }
         onError?.(this.extractErrorMessage(err, 'Failed to update profile.'));
       },
     });
@@ -156,15 +162,15 @@ export class AuthService {
       email: profile.user.email,
       bio: profile.bio ?? '',
       major: profile.major ?? '',
-      studyYear: profile.study_year ?? 1,
-      avatar: this.getAvatarUrl(profile.avatar, profile.user.username),
+      studyYear: profile.study_year ?? null,
+      avatar: this.getAvatarUrl(profile.avatar),
       isTutor: profile.is_tutor,
     };
   }
 
-  private getAvatarUrl(avatar: string, username: string) {
+  private getAvatarUrl(avatar: string) {
     if (!avatar) {
-      return `https://i.pravatar.cc/160?u=${encodeURIComponent(username)}`;
+      return '';
     }
     if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
       return avatar;

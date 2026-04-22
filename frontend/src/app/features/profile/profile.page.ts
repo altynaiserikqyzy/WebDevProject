@@ -12,7 +12,13 @@ import { AuthService } from '../../core/auth.service';
     @if (auth.user(); as user) {
       <section class="section-wrap space-y-6">
         <article class="glass grid gap-5 p-6 md:grid-cols-[auto,1fr]">
-          <img [src]="user.avatar" [alt]="user.fullName" class="h-24 w-24 rounded-full object-cover" />
+          @if (user.avatar) {
+            <img [src]="user.avatar" [alt]="user.fullName" class="h-24 w-24 rounded-full object-cover" />
+          } @else {
+            <div class="flex h-24 w-24 items-center justify-center rounded-full border border-white/20 bg-slate-900 text-2xl font-bold text-brand-100">
+              {{ (user.fullName || user.username).charAt(0).toUpperCase() }}
+            </div>
+          }
           <div>
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -22,16 +28,13 @@ import { AuthService } from '../../core/auth.service';
               <button class="btn-secondary" (click)="toggleEdit()">{{ editing ? 'Close' : 'Edit Profile' }}</button>
             </div>
             <p class="mt-3 text-slate-200">{{ user.bio }}</p>
-            <p class="mt-2 text-sm text-brand-100">{{ user.major }} · Year {{ user.studyYear }}</p>
+            @if (user.major || user.studyYear !== null) {
+              <p class="mt-2 text-sm text-brand-100">
+                {{ user.major || '' }}{{ user.major && user.studyYear !== null ? ' · ' : '' }}{{ user.studyYear !== null ? ('Year ' + user.studyYear) : '' }}
+              </p>
+            }
           </div>
         </article>
-
-        <div class="grid gap-4 md:grid-cols-3">
-          <article class="glass p-4">
-            <p class="text-sm text-slate-300">Account type</p>
-            <p class="text-2xl font-bold">{{ user.isTutor ? 'Tutor' : 'Student' }}</p>
-          </article>
-        </div>
 
         @if (editing) {
           <article class="glass grid gap-4 p-6 md:grid-cols-2">
@@ -39,8 +42,9 @@ import { AuthService } from '../../core/auth.service';
             <input [(ngModel)]="major" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Major" />
             <input [(ngModel)]="studyYear" type="number" min="1" max="6" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3" placeholder="Study year" />
             <label class="cursor-pointer rounded-xl border border-white/20 bg-slate-900 px-4 py-3 text-center text-sm text-slate-200 hover:border-brand-300">
-            {{ selectedAvatarFile?.name || 'Choose avatar image' }}
-            <input type="file" accept="image/*" (change)="onAvatarSelected($event)"  class="hidden"  /> </label>
+              {{ selectedAvatarFile?.name || 'Choose avatar image' }}
+              <input type="file" accept="image/*" (change)="onAvatarSelected($event)" class="hidden" />
+            </label>
             <textarea [(ngModel)]="bio" rows="4" class="rounded-xl border border-white/20 bg-slate-900 px-4 py-3 md:col-span-2" placeholder="Bio"></textarea>
             @if (error()) {
               <p class="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 md:col-span-2">{{ error() }}</p>
@@ -100,18 +104,19 @@ import { AuthService } from '../../core/auth.service';
             @for (service of myServices(); track service.id) {
               <article class="rounded-2xl border border-white/10 bg-slate-900/70 p-4">
                 <div class="flex items-start justify-between gap-3">
-                <div>
-                  <h3 class="font-semibold text-white">{{ service.title }}</h3>
-                  <p class="mt-1 text-sm text-brand-200">
-                    {{ service.subject }} · {{ service.price }} KZT/h · {{ service.format }}
-                  </p>
-                </div>
+                  <div>
+                    <p class="text-lg font-bold uppercase tracking-wide text-brand-100">{{ service.subject }}</p>
+                    <h3 class="font-semibold text-white">{{ service.title }}</h3>
+                    <p class="mt-1 text-sm text-brand-200">
+                      {{ service.price }} KZT/h · {{ service.format }}
+                    </p>
+                  </div>
 
-                <div class="flex gap-2">
-                  <button (click)="deleteService(service.id)">Delete</button>
+                  <div class="flex gap-2">
+                    <button (click)="deleteService(service.id)">Delete</button>
+                  </div>
                 </div>
-              </div>
-                              <p class="mt-3 text-sm text-slate-300">{{ service.description }}</p>
+                <p class="mt-3 text-sm text-slate-300">{{ service.description }}</p>
               </article>
             } @empty {
               <article class="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-slate-400 md:col-span-2">
@@ -122,9 +127,9 @@ import { AuthService } from '../../core/auth.service';
         </article>
 
         <article class="glass p-6">
-          <h2 class="text-xl font-semibold">Start chatting</h2>
-          <p class="mt-1 text-slate-300">Use the chat page to find registered users and open one unique conversation per pair.</p>
-          <a routerLink="/chat" class="btn-secondary mt-4 inline-flex">Open Chat</a>
+          <h2 class="text-xl font-semibold">Contact Tutors</h2>
+          <p class="mt-1 text-slate-300">Use Telegram to discuss lesson details directly with tutors.</p>
+          <a href="https://t.me/" target="_blank" rel="noopener noreferrer" class="btn-secondary mt-4 inline-flex">Open Telegram</a>
         </article>
       </section>
     }
@@ -138,7 +143,7 @@ export class ProfilePage {
   fullName = '';
   bio = '';
   major = '';
-  studyYear = 1;
+  studyYear: number | null = null;
   selectedAvatarFile: File | null = null;
   readonly myServices = signal<Array<any>>([]);
 
@@ -157,22 +162,21 @@ export class ProfilePage {
       this.fillForm();
     }
   }
-  deleteService(id: number) {
-  if (!confirm('Delete this service?')) return;
 
-  this.api.deleteService(id).subscribe({
-    next: () => {
-      // удалить из UI сразу (без reload)
-      this.myServices.update(services =>
-        services.filter(s => s.id !== id)
-      );
-    },
-    error: (err) => {
-      console.log(err);
-      alert('Failed to delete');
-    }
-  });
-}
+  deleteService(id: number) {
+    if (!confirm('Delete this service?')) return;
+
+    this.api.deleteService(id).subscribe({
+      next: () => {
+        this.myServices.update((services) => services.filter((s) => s.id !== id));
+      },
+      error: (err) => {
+        console.log(err);
+        alert('Failed to delete');
+      },
+    });
+  }
+
   onAvatarSelected(event: Event) {
     const input = event.target as HTMLInputElement;
     this.selectedAvatarFile = input.files?.[0] ?? null;
@@ -182,33 +186,37 @@ export class ProfilePage {
     const fullName = this.fullName.trim();
     const major = this.major.trim();
     const bio = this.bio.trim();
-    const studyYear = Number(this.studyYear);
+    const studyYear = this.studyYear === null || this.studyYear === undefined ? null : Number(this.studyYear);
 
     if (!fullName) {
       this.error.set('Full name is required.');
       return;
     }
-    if (!Number.isFinite(studyYear) || studyYear < 1 || studyYear > 6) {
+    if (studyYear !== null && (!Number.isFinite(studyYear) || studyYear < 1 || studyYear > 6)) {
       this.error.set('Study year must be between 1 and 6.');
       return;
     }
 
     this.error.set('');
     this.saving.set(true);
-    this.auth.updateProfile({
-      fullName,
-      bio,
-      major,
-      studyYear,
-      avatarFile: this.selectedAvatarFile,
-    }, () => {
-      this.saving.set(false);
-      this.editing = false;
-      this.selectedAvatarFile = null;
-    }, (message) => {
-      this.saving.set(false);
-      this.error.set(message);
-    });
+    this.auth.updateProfile(
+      {
+        fullName,
+        bio,
+        major,
+        studyYear,
+        avatarFile: this.selectedAvatarFile,
+      },
+      () => {
+        this.saving.set(false);
+        this.editing = false;
+        this.selectedAvatarFile = null;
+      },
+      (message) => {
+        this.saving.set(false);
+        this.error.set(message);
+      }
+    );
   }
 
   becomeTutor() {

@@ -33,11 +33,12 @@ import { ApiService } from '../../core/api.service';
                 <h3 class="font-semibold">{{ tutor.name }}</h3>
                 <p class="text-sm text-slate-300">{{ tutor.title }}</p>
                 <p class="text-sm text-brand-200">{{ tutor.price }} KZT/h · {{ tutor.format }}</p>
+                <p class="mt-1 text-xs text-slate-400">{{ tutor.rating.toFixed(1) }} ★ · {{ tutor.reviewsCount }} reviews</p>
               </div>
             </div>
             <p class="mt-3 text-sm text-slate-300">{{ tutor.description }}</p>
             <div class="mt-4 flex gap-2">
-              <a [routerLink]="['/chat']" [queryParams]="{ userId: tutor.userId }" class="btn-secondary px-4 py-2 text-sm">Message</a>
+              <a href="https://t.me/" target="_blank" rel="noopener noreferrer" class="btn-secondary px-4 py-2 text-sm">Telegram</a>
               <a [routerLink]="['/tutors', tutor.id]" class="btn-primary px-4 py-2 text-sm">View Profile</a>
             </div>
           </article>
@@ -60,6 +61,8 @@ export class TutorsPage {
     price: string;
     format: string;
     avatar: string;
+    rating: number;
+    reviewsCount: number;
     createdAt: string;
   }>>([]);
 
@@ -105,6 +108,8 @@ export class TutorsPage {
             price: primaryService?.price_per_hour ?? '0.00',
             format: String(primaryService?.format ?? 'online').toLowerCase(),
             avatar: this.getAvatarUrl(profile.avatar, username || String(profile.id)),
+            rating: Number(profile.rating ?? 0),
+            reviewsCount: Number(profile.reviews_count ?? 0),
             createdAt: primaryService?.created_at ?? '',
           };
         });

@@ -15,7 +15,24 @@ export interface User {
 export interface Subject {
   id: number;
   name: string;
-  icon: string;
+  icon?: string;
+}
+
+export interface TutorAvailabilitySlot {
+  id?: number;
+  date: string;
+  start_time: string;
+  end_time: string;
+  format: LessonFormat;
+}
+
+export interface TutorServicePayload {
+  subject_id: number;
+  service_title: string;
+  description: string;
+  price_per_hour: number;
+  format: LessonFormat;
+  slots: TutorAvailabilitySlot[];
 }
 
 export interface Review {
@@ -67,25 +84,8 @@ export interface Booking {
   meetLink?: string;
 }
 
-export interface ChatThread {
-  id: number;
-  tutorId: number;
-  tutorName: string;
-  avatar: string;
-  lastMessage: string;
-  updatedAt: string;
-}
-
-export interface Message {
-  id: number;
-  threadId: number;
-  sender: 'me' | 'tutor';
-  content: string;
-  time: string;
-}
-
 export interface LoginRequest {
-  username: string;
+  email: string;
   password: string;
 }
 
@@ -108,7 +108,7 @@ export interface AuthUser {
   email: string;
   bio: string;
   major: string;
-  studyYear: number;
+  studyYear: number | null;
   avatar: string;
   isTutor: boolean;
 }
@@ -125,32 +125,3 @@ export interface UserSearchResult {
   avatar: string;
 }
 
-export interface LocalChatThread {
-  id: number;
-  participantIds: [number, number];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface LocalChatMessage {
-  id: number;
-  threadId: number;
-  senderId: number;
-  text: string;
-  createdAt: string;
-}
-
-export interface ChatPreview {
-  id: number;
-  otherUser: UserSearchResult;
-  lastMessage: string;
-  updatedAt: string;
-}
-
-export interface ChatViewMessage {
-  id: number;
-  senderId: number;
-  text: string;
-  createdAt: string;
-  isMine: boolean;
-}

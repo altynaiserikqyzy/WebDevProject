@@ -3,17 +3,18 @@ import time
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User 
 from django.db import OperationalError
+from django.db.models import Avg, Case, Count, IntegerField, Value, When
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Conversation, ConversationParticipant, Message, Profile, Subject, TutorService
+from .models import Profile, Subject, TutorAvailabilitySlot, TutorReview, TutorService
 from .serializers import (
-    ConversationSerializer,
-    MessageSerializer,
     ProfileSerializer,
     SubjectSerializer,
+    TutorAvailabilitySlotCreateSerializer,
+    TutorReviewSerializer,
     TutorServiceSerializer,
     UserSerializer, SignupSerializer, LoginSerializer,
 )
@@ -33,10 +34,32 @@ def with_db_retry(operation, retries=5, delay=0.15):
             time.sleep(delay)
     raise last_error
 
+DISCIPLINE_SUBJECTS = [
+    'Calculus',
+    'Linear Algebra for Engineers',
+    'Theoretical Mechanics',
+    'Programming Principles I',
+    'Statistics',
+    'Accounting',
+]
+
 class SubjectListAPIView(generics.ListAPIView):
-    queryset = Subject.objects.all().order_by('name')
     serializer_class = SubjectSerializer
     permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        existing_names = set(
+            Subject.objects.filter(name__in=DISCIPLINE_SUBJECTS).values_list('name', flat=True)
+        )
+        for name in DISCIPLINE_SUBJECTS:
+            if name not in existing_names:
+                with_db_retry(lambda subject_name=name: Subject.objects.create(name=subject_name))
+
+        order_case = Case(
+            *[When(name=name, then=Value(index)) for index, name in enumerate(DISCIPLINE_SUBJECTS)],
+            output_field=IntegerField(),
+        )
+        return Subject.objects.filter(name__in=DISCIPLINE_SUBJECTS).annotate(_order=order_case).order_by('_order')
 
 
 class TutorServiceDetailAPIView(APIView):
@@ -47,7 +70,7 @@ class TutorServiceDetailAPIView(APIView):
 
     def get(self, request, pk):
         try:
-            service = TutorService.objects.select_related('tutor__user', 'subject').get(pk=pk)
+            service = TutorService.objects.select_related('tutor__user', 'subject').prefetch_related('slots').get(pk=pk)
         except TutorService.DoesNotExist:
             return Response({'detail': 'Service not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -95,17 +118,49 @@ class MyProfileAPIView(APIView):
 class MyServicesAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request):
-        services = TutorService.objects.select_related('tutor__user', 'subject').filter(
+        services = TutorService.objects.select_related('tutor__user', 'subject').prefetch_related('slots').filter(
             tutor__user=request.user
         ).order_by('-created_at')
         serializer = TutorServiceSerializer(services, many=True)
         return Response(serializer.data)
 
+
+class TutorServiceSlotCreateAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            service = TutorService.objects.select_related('tutor__user').get(pk=pk)
+        except TutorService.DoesNotExist:
+            return Response({'detail': 'Service not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if service.tutor.user_id != request.user.id:
+            return Response({'detail': 'You can add slots only to your own service.'}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = TutorAvailabilitySlotCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        slot_data = serializer.validated_data
+        if TutorAvailabilitySlot.objects.filter(
+            tutor_service=service,
+            date=slot_data['date'],
+            start_time=slot_data['start_time'],
+            end_time=slot_data['end_time'],
+            format=slot_data['format'],
+        ).exists():
+            return Response(
+                {'detail': 'This slot already exists for the selected service.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        slot = with_db_retry(lambda: TutorAvailabilitySlot.objects.create(tutor_service=service, **slot_data))
+        return Response(TutorAvailabilitySlotCreateSerializer(slot).data, status=status.HTTP_201_CREATED)
+
 class TutorServiceListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get(self, request):
-        services = TutorService.objects.select_related('tutor__user', 'subject').filter(is_active=True)
+        services = TutorService.objects.select_related('tutor__user', 'subject').prefetch_related('slots').filter(is_active=True)
         search = request.query_params.get('search')
         subject_id = request.query_params.get('subject')
         format_value = request.query_params.get('format')
@@ -156,8 +211,9 @@ class TutorProfileListAPIView(APIView):
     def get(self, request):
         profiles = (
             Profile.objects.select_related('user')
-            .prefetch_related('services__subject')
+            .prefetch_related('services__subject', 'services__slots', 'reviews')
             .filter(is_tutor=True)
+            .annotate(avg_rating=Avg('reviews__rating'), reviews_count=Count('reviews'))
         )
 
         if request.user.is_authenticated:
@@ -173,6 +229,8 @@ class TutorProfileListAPIView(APIView):
         return {
             **ProfileSerializer(profile).data,
             'services': TutorServiceSerializer(services, many=True).data,
+            'rating': float(profile.avg_rating or 0),
+            'reviews_count': int(profile.reviews_count or 0),
         }
 
 class TutorProfileDetailAPIView(APIView):
@@ -182,7 +240,8 @@ class TutorProfileDetailAPIView(APIView):
         try:
             profile = (
                 Profile.objects.select_related('user')
-                .prefetch_related('services__subject')
+                .prefetch_related('services__subject', 'services__slots', 'reviews')
+                .annotate(avg_rating=Avg('reviews__rating'), reviews_count=Count('reviews'))
                 .get(pk=pk, is_tutor=True)
             )
         except Profile.DoesNotExist:
@@ -193,134 +252,18 @@ class TutorProfileDetailAPIView(APIView):
         return Response({
             **ProfileSerializer(profile).data,
             'services': TutorServiceSerializer(services, many=True).data,
+            'rating': float(profile.avg_rating or 0),
+            'reviews_count': int(profile.reviews_count or 0),
+            'reviews': TutorReviewSerializer(profile.reviews.all(), many=True).data,
         })
 
-
-class UserSearchAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        query = request.query_params.get('q', '').strip()
-
-        if not query:
-            return Response([])
-
-        users = User.objects.filter(
-            username__icontains=query
-        ).exclude(id=request.user.id)
-
-        profile_users = User.objects.filter(
-            profile__full_name__icontains=query
-        ).exclude(id=request.user.id)
-
-        email_users = User.objects.filter(
-            email__icontains=query
-        ).exclude(id=request.user.id)
-
-        users = (users | profile_users | email_users).distinct()
-
-        serializer = UserSerializer(users, many=True)
-        return Response(serializer.data)
-
-
-class StartConversationAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def post(self, request):
-        other_user_id = request.data.get('user_id')
-
-        if not other_user_id:
-            return Response({'detail': 'user_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            other_user = User.objects.get(id=other_user_id)
-        except User.DoesNotExist:
-            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        if other_user.id == request.user.id:
-            return Response({'detail': 'You cannot chat with yourself.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        conversations = Conversation.objects.filter(participants__user=request.user).filter(participants__user=other_user).distinct()
-
-        conversation = None
-        for item in conversations:
-            if item.participants.count() == 2:
-                conversation = item
-                break
-
-        if conversation is None:
-            conversation = with_db_retry(lambda: Conversation.objects.create())
-            with_db_retry(lambda: ConversationParticipant.objects.create(conversation=conversation, user=request.user))
-            with_db_retry(lambda: ConversationParticipant.objects.create(conversation=conversation, user=other_user))
-
-        serializer = ConversationSerializer(conversation)
-        return Response(serializer.data)
-
-
-class MyConversationListAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request):
-        conversations = Conversation.objects.filter(participants__user=request.user).distinct().order_by('-updated_at')
-        serializer = ConversationSerializer(conversations, many=True)
-        return Response(serializer.data)
-
-
-class ConversationMessagesAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-
-    def get(self, request, conversation_id):
-        try:
-            conversation = Conversation.objects.get(id=conversation_id, participants__user=request.user)
-        except Conversation.DoesNotExist:
-            return Response({'detail': 'Conversation not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        messages = conversation.messages.select_related('sender').order_by('created_at')
-        serializer = MessageSerializer(messages, many=True)
-        return Response(serializer.data)
-
-    def post(self, request, conversation_id):
-        try:
-            conversation = Conversation.objects.get(id=conversation_id, participants__user=request.user)
-        except Conversation.DoesNotExist:
-            return Response({'detail': 'Conversation not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        serializer = MessageSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        with_db_retry(lambda: serializer.save(conversation=conversation, sender=request.user))
-
-        with_db_retry(lambda: conversation.save())
-
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 class SignupAPIView(APIView):
     permission_classes = [permissions.AllowAny]
     def post(self, request):
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        username = serializer.validated_data['username']
-        email = serializer.validated_data['email']
-        password = serializer.validated_data['password']
-        full_name = serializer.validated_data['full_name']
-        if User.objects.filter(username=username).exists():
-            return Response(
-                {'detail': 'Username already exists.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        if User.objects.filter(email=email).exists():
-            return Response(
-                {'detail': 'Email already exists.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        user = with_db_retry(lambda: User.objects.create_user(
-            username=username,
-            email=email,
-            password=password,
-        ))
-        with_db_retry(lambda: Profile.objects.create(
-            user=user,
-            full_name=full_name
-        ))
+        user = with_db_retry(lambda: serializer.save())
         refresh = RefreshToken.for_user(user)
         return Response(
             {
@@ -368,22 +311,20 @@ class LoginAPIView(APIView):
         serializer = LoginSerializer(data = request.data)
         serializer.is_valid(raise_exception=True)
 
-        username = serializer.validated_data['username'].strip()
+        email = serializer.validated_data['email'].strip().lower()
         password = serializer.validated_data['password']
 
-        user = User.objects.filter(username__iexact=username).first()
-        if user is None:
-            user = User.objects.filter(email__iexact=username).first()
+        user = User.objects.filter(email__iexact=email).first()
 
         if user is None:
             return Response({
-                "detail":"Incorrect username or password"
+                "detail":"Incorrect email or password"
             } , status=status.HTTP_401_UNAUTHORIZED)
 
         authenticated_user = authenticate(request, username=user.username, password=password)
         if authenticated_user is None:
             return Response({
-                "detail":"Incorrect username or password"
+                "detail":"Incorrect email or password"
             } , status=status.HTTP_401_UNAUTHORIZED)
 
         refresh = RefreshToken.for_user(authenticated_user)

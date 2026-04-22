@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { LoginRequest, LoginResponse, SignupRequest, Subject } from './models';
+import { LoginRequest, LoginResponse, SignupRequest, Subject, TutorAvailabilitySlot, TutorServicePayload } from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -73,7 +73,7 @@ export class ApiService {
     full_name?: string;
     bio?: string;
     major?: string;
-    study_year?: number;
+    study_year?: number | null;
     avatarFile?: File | null;
   }): Observable<any> {
     const formData = new FormData();
@@ -87,7 +87,7 @@ export class ApiService {
     if (payload.major !== undefined) {
       formData.append('major', payload.major);
     }
-    if (payload.study_year !== undefined) {
+    if (payload.study_year !== undefined && payload.study_year !== null) {
       formData.append('study_year', String(payload.study_year));
     }
     if (payload.avatarFile) {
@@ -156,6 +156,10 @@ export class ApiService {
     return this.http.get<any[]>(`${this.baseUrl}/services/my/`);
   }
 
+  getMyTutorServices(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/my-tutor-services/`);
+  }
+
   createService(payload: {
     subject_id?: number;
     subject_name?: string;
@@ -164,30 +168,21 @@ export class ApiService {
     price_per_hour: string;
     format: string;
   }): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/services/`, payload);
+    return this.http.post<any>(`${this.baseUrl}/tutor-services/`, {
+      subject_id: payload.subject_id,
+      service_title: payload.title,
+      description: payload.description,
+      price_per_hour: Number(payload.price_per_hour),
+      format: payload.format,
+      slots: [],
+    });
   }
 
-
-  searchUsers(query: string): Observable<Array<{ id: number; username: string; email: string; full_name: string }>> {
-    return this.http.get<Array<{ id: number; username: string; email: string; full_name: string }>>(
-      `${this.baseUrl}/users/search/?q=${encodeURIComponent(query)}`
-    );
+  createTutorService(payload: TutorServicePayload): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/tutor-services/`, payload);
   }
 
-  listConversations(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/conversations/`);
+  createTutorServiceSlot(serviceId: number, slot: TutorAvailabilitySlot): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/tutor-services/${serviceId}/slots/`, slot);
   }
-
-  startConversation(user_id: number): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/conversations/start/`, { user_id });
-  }
-
-  getConversationMessages(conversationId: number): Observable<any[]> {
-    return this.http.get<any[]>(`${this.baseUrl}/conversations/${conversationId}/messages/`);
-  }
-
-  sendConversationMessage(conversationId: number, text: string): Observable<any> {
-    return this.http.post<any>(`${this.baseUrl}/conversations/${conversationId}/messages/`, { text });
-  }
-
 }
