@@ -1,7 +1,9 @@
 from django.urls import path
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
+    BookingViewSet,
     MyProfileAPIView,
     SubjectListAPIView,
     TutorServiceDetailAPIView,
@@ -17,6 +19,9 @@ from .views import (
 
 
 )
+
+router = DefaultRouter()
+router.register('bookings', BookingViewSet, basename='booking')
 
 urlpatterns = [
     path('auth/signup/', SignupAPIView.as_view(), name='auth-signup'),
@@ -39,3 +44,5 @@ urlpatterns = [
     path('tutors/<int:pk>/', TutorProfileDetailAPIView.as_view(), name='tutor-detail'),
 
 ]
+
+urlpatterns += router.urls

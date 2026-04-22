@@ -171,8 +171,12 @@ export class ProfilePage {
         this.myServices.update((services) => services.filter((s) => s.id !== id));
       },
       error: (err) => {
-        console.log(err);
-        alert('Failed to delete');
+        const detail = err?.error?.detail;
+        const message =
+          (typeof detail === 'string' && detail.trim()) ||
+          (Array.isArray(detail) && detail.length ? String(detail[0]) : '') ||
+          'Failed to delete';
+        alert(message);
       },
     });
   }

@@ -3,14 +3,20 @@ import time
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User 
 from django.db import OperationalError
-from django.db.models import Avg, Case, Count, IntegerField, Value, When
-from rest_framework import generics, permissions, status
+from django.db.models.deletion import ProtectedError
+from django.db.models import Avg, Case, Count, IntegerField, Q, Value, When
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import generics, mixins, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Profile, Subject, TutorAvailabilitySlot, TutorReview, TutorService
+from .models import Booking, Profile, Subject, TutorAvailabilitySlot, TutorReview, TutorService
 from .serializers import (
+    BookingCreateSerializer,
+    BookingReasonSerializer,
+    BookingSerializer,
     ProfileSerializer,
     SubjectSerializer,
     TutorAvailabilitySlotCreateSerializer,
@@ -86,7 +92,18 @@ class TutorServiceDetailAPIView(APIView):
         if service.tutor.user_id != request.user.id:
             return Response({'detail': 'You can delete only your own service.'}, status=status.HTTP_403_FORBIDDEN)
 
-        with_db_retry(lambda: service.delete())
+        try:
+            with_db_retry(lambda: service.delete())
+        except ProtectedError:
+            return Response(
+                {
+                    'detail': (
+                        'This service cannot be deleted because it already has bookings. '
+                        'Cancel or complete related bookings first.'
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -343,3 +360,83 @@ class MeAPIView(APIView):
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class BookingViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return (
+            Booking.objects
+            .select_related(
+                'student',
+                'student__profile',
+                'tutor',
+                'tutor__user',
+                'service',
+                'service__subject',
+                'slot',
+                'status_changed_by',
+                'cancelled_by',
+                'no_show_marked_by',
+            )
+            .filter(Q(student=self.request.user) | Q(tutor__user=self.request.user))
+            .order_by('-scheduled_start_at', '-id')
+        )
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return BookingCreateSerializer
+        return BookingSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        booking = serializer.save()
+        output = BookingSerializer(booking, context={'request': request})
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'], url_path='confirm')
+    def confirm(self, request, pk=None):
+        return self._transition(request, pk, 'confirm')
+
+    @action(detail=True, methods=['post'], url_path='reject')
+    def reject(self, request, pk=None):
+        return self._transition(request, pk, 'reject', with_reason=True)
+
+    @action(detail=True, methods=['post'], url_path='cancel')
+    def cancel(self, request, pk=None):
+        return self._transition(request, pk, 'cancel', with_reason=True)
+
+    @action(detail=True, methods=['post'], url_path='complete')
+    def complete(self, request, pk=None):
+        return self._transition(request, pk, 'complete')
+
+    @action(detail=True, methods=['post'], url_path='no-show')
+    def no_show(self, request, pk=None):
+        return self._transition(request, pk, 'mark_no_show')
+
+    def _transition(self, request, pk, method_name, with_reason=False):
+        booking = self.get_object()
+        reason = ''
+        if with_reason:
+            payload = BookingReasonSerializer(data=request.data)
+            payload.is_valid(raise_exception=True)
+            reason = payload.validated_data.get('reason', '')
+
+        try:
+            if with_reason:
+                getattr(booking, method_name)(request.user, reason=reason)
+            else:
+                getattr(booking, method_name)(request.user)
+        except DjangoValidationError as exc:
+            detail = exc.message_dict if hasattr(exc, 'message_dict') else exc.messages
+            return Response({'detail': detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        output = BookingSerializer(booking, context={'request': request})
+        return Response(output.data, status=status.HTTP_200_OK)

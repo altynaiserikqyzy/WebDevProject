@@ -77,6 +77,10 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS': False,
 }
 
+# Booking business rules (backend source of truth)
+BOOKING_CANCELLATION_WINDOW_HOURS = 6
+BOOKING_NO_SHOW_GRACE_MINUTES = 15
+
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
@@ -135,7 +139,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Almaty'
 
 USE_I18N = True
 

@@ -2,7 +2,17 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { LoginRequest, LoginResponse, SignupRequest, Subject, TutorAvailabilitySlot, TutorServicePayload } from './models';
+import {
+  Booking,
+  BookingCreatePayload,
+  BookingReasonPayload,
+  LoginRequest,
+  LoginResponse,
+  SignupRequest,
+  Subject,
+  TutorAvailabilitySlot,
+  TutorServicePayload
+} from './models';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -184,5 +194,37 @@ export class ApiService {
 
   createTutorServiceSlot(serviceId: number, slot: TutorAvailabilitySlot): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/tutor-services/${serviceId}/slots/`, slot);
+  }
+
+  listMyBookings(): Observable<Booking[]> {
+    return this.http.get<Booking[]>(`${this.baseUrl}/bookings/`);
+  }
+
+  getBooking(id: number): Observable<Booking> {
+    return this.http.get<Booking>(`${this.baseUrl}/bookings/${id}/`);
+  }
+
+  createBooking(payload: BookingCreatePayload): Observable<Booking> {
+    return this.http.post<Booking>(`${this.baseUrl}/bookings/`, payload);
+  }
+
+  confirmBooking(id: number): Observable<Booking> {
+    return this.http.post<Booking>(`${this.baseUrl}/bookings/${id}/confirm/`, {});
+  }
+
+  rejectBooking(id: number, payload: BookingReasonPayload): Observable<Booking> {
+    return this.http.post<Booking>(`${this.baseUrl}/bookings/${id}/reject/`, payload);
+  }
+
+  cancelBooking(id: number, payload: BookingReasonPayload): Observable<Booking> {
+    return this.http.post<Booking>(`${this.baseUrl}/bookings/${id}/cancel/`, payload);
+  }
+
+  completeBooking(id: number): Observable<Booking> {
+    return this.http.post<Booking>(`${this.baseUrl}/bookings/${id}/complete/`, {});
+  }
+
+  markNoShowBooking(id: number): Observable<Booking> {
+    return this.http.post<Booking>(`${this.baseUrl}/bookings/${id}/no-show/`, {});
   }
 }

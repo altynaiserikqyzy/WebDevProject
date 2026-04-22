@@ -69,26 +69,55 @@ export class PlatformService {
     { id: 2, studentName: 'Nazerke', rating: 5, date: '2026-03-18', comment: 'Finally understood matrices and passed confidently.' }
   ]);
 
-  readonly bookings = signal<Booking[]>([
-    {
-      id: 1,
-      tutorId: 1,
-      subjectName: 'Calculus',
-      date: '2026-04-19',
-      time: '18:00',
-      format: 'online',
-      sessionsCount: 2,
-      totalPrice: 14000,
-      status: 'confirmed',
-      eventColor: '#8b5cf6',
-      meetLink: 'https://meet.google.com/nrt-kbtu-calc'
-    }
-  ]);
+  readonly bookings = signal<Booking[]>([]);
 
   readonly upcomingSessions = computed(() => this.bookings().filter((booking) => booking.status !== 'cancelled'));
 
-  addBooking(booking: Omit<Booking, 'id' | 'status'>) {
-    this.bookings.update((items) => [...items, { id: Date.now(), status: 'pending', ...booking }]);
+  addBooking(booking: {
+    tutorId: number;
+    subjectName: string;
+    date: string;
+    time: string;
+    format: 'online' | 'offline';
+    sessionsCount: number;
+    totalPrice: number;
+    meetLink?: string;
+    studentName?: string;
+    teacherName?: string;
+  }) {
+    const [startPart, endPart] = String(booking.time || '').split('-');
+    const startTime = (startPart || '10:00').slice(0, 5);
+    const endTime = (endPart || '11:00').slice(0, 5);
+    const scheduledStart = `${booking.date}T${startTime}:00Z`;
+    const scheduledEnd = `${booking.date}T${endTime}:00Z`;
+    const nowIso = new Date().toISOString();
+    const fallbackTeacherName = this.tutors().find((tutor) => tutor.id === booking.tutorId)?.name ?? 'Tutor';
+
+    const normalized: Booking = {
+      id: Date.now(),
+      status: 'pending',
+      student_name: booking.studentName ?? 'Student',
+      teacher_name: booking.teacherName ?? fallbackTeacherName,
+      subject_name: booking.subjectName,
+      service_title: booking.subjectName,
+      scheduled_start_at: scheduledStart,
+      scheduled_end_at: scheduledEnd,
+      format: booking.format,
+      number_of_sessions: Math.max(1, Number(booking.sessionsCount) || 1),
+      total_price: String(booking.totalPrice ?? ''),
+      meet_link: booking.meetLink,
+      cancel_reason: '',
+      rejection_reason: '',
+      no_show_marked_at: null,
+      completed_at: null,
+      cancellation_deadline_at: null,
+      allowed_actions: [],
+      can_payment_be_initiated: false,
+      created_at: nowIso,
+      updated_at: nowIso,
+    };
+
+    this.bookings.update((items) => [...items, normalized]);
   }
 
   addTutorService(service: TutorService) {

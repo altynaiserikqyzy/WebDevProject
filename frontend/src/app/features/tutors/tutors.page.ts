@@ -1,5 +1,5 @@
-import { Component, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+﻿import { Component, signal } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { ApiService } from '../../core/api.service';
 
@@ -30,10 +30,11 @@ import { ApiService } from '../../core/api.service';
             <div class="flex gap-4">
               <img [src]="tutor.avatar" class="h-16 w-16 rounded-full object-cover" [alt]="tutor.name" />
               <div class="flex-1">
+                <p class="text-xs font-semibold uppercase tracking-[0.08em] text-brand-200">{{ tutor.subject }}</p>
                 <h3 class="font-semibold">{{ tutor.name }}</h3>
                 <p class="text-sm text-slate-300">{{ tutor.title }}</p>
-                <p class="text-sm text-brand-200">{{ tutor.price }} KZT/h · {{ tutor.format }}</p>
-                <p class="mt-1 text-xs text-slate-400">{{ tutor.rating.toFixed(1) }} ★ · {{ tutor.reviewsCount }} reviews</p>
+                <p class="text-sm text-brand-200">{{ tutor.price }} KZT/h · {{ formatLabel(tutor.format) }}</p>
+                <p class="mt-1 text-xs text-slate-400">{{ tutor.rating.toFixed(1) }} в… В· {{ tutor.reviewsCount }} reviews</p>
               </div>
             </div>
             <p class="mt-3 text-sm text-slate-300">{{ tutor.description }}</p>
@@ -69,8 +70,17 @@ export class TutorsPage {
   private search = '';
   private format = '';
   private sort: 'newest' | 'price' = 'newest';
+  private subjectFromQuery = '';
 
-  constructor(private readonly api: ApiService) {
+  constructor(
+    private readonly api: ApiService,
+    private readonly route: ActivatedRoute
+  ) {
+    this.route.queryParamMap.subscribe((params) => {
+      this.subjectFromQuery = (params.get('subject') ?? '').trim().toLowerCase();
+      this.loadTutors();
+    });
+
     this.loadTutors();
   }
 
@@ -88,12 +98,23 @@ export class TutorsPage {
     this.sort = value;
     this.loadTutors();
   }
-
+  formatLabel(format: string) {
+    const normalized = String(format ?? '').toLowerCase();
+    if (normalized === 'both') {
+      return 'Online/Offline';
+    }
+    if (normalized === 'offline') {
+      return 'Offline';
+    }
+    return 'Online';
+  }
   private loadTutors() {
     this.api.listTutors().subscribe({
       next: (profiles) => {
         const normalizedSearch = this.search.trim().toLowerCase();
-        const mapped = profiles.map((profile) => {
+        const mapped = profiles
+          .filter((profile) => (profile.services?.length ?? 0) > 0)
+          .map((profile) => {
           const primaryService = profile.services?.[0];
           const username = profile.user?.username ?? '';
 
@@ -114,8 +135,17 @@ export class TutorsPage {
           };
         });
 
-        const formatFiltered = this.format
-          ? mapped.filter((tutor) => tutor.format === this.format.toLowerCase())
+        const selectedFormat = this.format.toLowerCase();
+        const formatFiltered = selectedFormat
+          ? mapped.filter((tutor) =>
+              selectedFormat === 'both'
+                ? ['online', 'offline', 'both'].includes(tutor.format)
+                : selectedFormat === 'online'
+                  ? ['online', 'both'].includes(tutor.format)
+                  : selectedFormat === 'offline'
+                    ? ['offline', 'both'].includes(tutor.format)
+                    : tutor.format === selectedFormat
+            )
           : mapped;
 
         const filtered = normalizedSearch
@@ -126,7 +156,11 @@ export class TutorsPage {
             )
           : formatFiltered;
 
-        const sorted = [...filtered].sort((a, b) =>
+        const subjectFiltered = this.subjectFromQuery
+          ? filtered.filter((tutor) => tutor.subject.toLowerCase().includes(this.subjectFromQuery))
+          : filtered;
+
+        const sorted = [...subjectFiltered].sort((a, b) =>
           this.sort === 'price'
             ? Number(a.price) - Number(b.price)
             : b.createdAt.localeCompare(a.createdAt)
@@ -153,3 +187,5 @@ export class TutorsPage {
     return `http://127.0.0.1:8000${avatar}`;
   }
 }
+
+

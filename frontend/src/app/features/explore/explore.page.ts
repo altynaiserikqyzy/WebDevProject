@@ -15,6 +15,7 @@ import { PlatformService } from '../../core/platform.service';
         @for (subject of platform.subjects(); track subject.id) {
           <a
             routerLink="/tutors"
+            [queryParams]="{ subject: normalizedSubject(subject.name) }"
             class="glass subject-card block rounded-2xl p-5 transition hover:-translate-y-1"
             [class.subject-card-calculus]="subject.name === 'Calculus |'"
             [class.subject-card-linear-algebra]="subject.name === 'Linear Algebra for Engineers'"
@@ -100,4 +101,8 @@ import { PlatformService } from '../../core/platform.service';
 })
 export class ExplorePage {
   constructor(public readonly platform: PlatformService) {}
+
+  normalizedSubject(name: string) {
+    return String(name ?? '').replace('|', '').trim();
+  }
 }

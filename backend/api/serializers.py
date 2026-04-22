@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from django.contrib.auth.models import User
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
-from .models import Profile, Subject, TutorAvailabilitySlot, TutorReview, TutorService
+from .models import Booking, Profile, Subject, TutorAvailabilitySlot, TutorReview, TutorService
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -216,3 +219,142 @@ class LoginSerializer(serializers.Serializer):
         if not email.endswith('@kbtu.kz'):
             raise serializers.ValidationError('Use your KBTU email (@kbtu.kz).')
         return email
+
+
+class BookingSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    teacher_name = serializers.SerializerMethodField()
+    subject_name = serializers.SerializerMethodField()
+    service_title = serializers.CharField(source='service.title', read_only=True)
+    allowed_actions = serializers.SerializerMethodField()
+    cancellation_deadline_at = serializers.DateTimeField(read_only=True)
+    can_payment_be_initiated = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Booking
+        fields = [
+            'id',
+            'status',
+            'student_name',
+            'teacher_name',
+            'subject_name',
+            'service_title',
+            'scheduled_start_at',
+            'scheduled_end_at',
+            'format',
+            'number_of_sessions',
+            'total_price',
+            'meet_link',
+            'cancelled_by',
+            'cancel_reason',
+            'rejection_reason',
+            'no_show_marked_by',
+            'no_show_marked_at',
+            'completed_at',
+            'status_changed_by',
+            'status_changed_at',
+            'cancellation_deadline_at',
+            'allowed_actions',
+            'can_payment_be_initiated',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = fields
+
+    def get_student_name(self, obj):
+        profile = getattr(obj.student, 'profile', None)
+        return (getattr(profile, 'full_name', '') or obj.student.username) if obj.student_id else 'Student'
+
+    def get_teacher_name(self, obj):
+        return obj.tutor.full_name if obj.tutor_id else 'Tutor'
+
+    def get_subject_name(self, obj):
+        return obj.service.subject.name if obj.service_id else ''
+
+    def get_allowed_actions(self, obj):
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        return obj.allowed_actions_for(user, at_time=timezone.now())
+
+    def get_can_payment_be_initiated(self, obj):
+        return obj.payment_ready
+
+
+class BookingCreateSerializer(serializers.Serializer):
+    service_id = serializers.IntegerField(required=True)
+    slot_id = serializers.IntegerField(required=True)
+
+    def validate(self, attrs):
+        request = self.context['request']
+        service_id = attrs['service_id']
+        slot_id = attrs['slot_id']
+
+        try:
+            service = (
+                TutorService.objects
+                .select_related('tutor__user', 'subject')
+                .get(id=service_id, is_active=True)
+            )
+        except TutorService.DoesNotExist:
+            raise serializers.ValidationError({'service_id': 'Service not found or inactive.'})
+
+        if service.tutor.user_id == request.user.id:
+            raise serializers.ValidationError({'service_id': 'You cannot book your own service.'})
+
+        try:
+            slot = TutorAvailabilitySlot.objects.select_related('tutor_service').get(
+                id=slot_id,
+                tutor_service_id=service.id
+            )
+        except TutorAvailabilitySlot.DoesNotExist:
+            raise serializers.ValidationError({'slot_id': 'Selected slot does not belong to this service.'})
+
+        if slot.is_booked:
+            raise serializers.ValidationError({'slot_id': 'This slot is already booked.'})
+
+        scheduled_start = timezone.make_aware(datetime.combine(slot.date, slot.start_time))
+        scheduled_end = timezone.make_aware(datetime.combine(slot.date, slot.end_time))
+        if scheduled_start >= scheduled_end:
+            raise serializers.ValidationError({'slot_id': 'Slot has invalid time range.'})
+        if scheduled_start <= timezone.now():
+            raise serializers.ValidationError({'slot_id': 'Cannot book a slot in the past.'})
+
+        attrs['service'] = service
+        attrs['slot'] = slot
+        attrs['scheduled_start_at'] = scheduled_start
+        attrs['scheduled_end_at'] = scheduled_end
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context['request']
+        service = validated_data['service']
+        slot_id = validated_data['slot'].id
+
+        with transaction.atomic():
+            slot = TutorAvailabilitySlot.objects.select_for_update().get(id=slot_id)
+            if slot.is_booked:
+                raise serializers.ValidationError({'slot_id': 'This slot was booked by another user.'})
+
+            slot.is_booked = True
+            slot.save(update_fields=['is_booked'])
+
+            booking = Booking.objects.create(
+                student=request.user,
+                tutor=service.tutor,
+                service=service,
+                slot=slot,
+                status=Booking.STATUS_PENDING,
+                scheduled_start_at=validated_data['scheduled_start_at'],
+                scheduled_end_at=validated_data['scheduled_end_at'],
+                format=slot.format if slot.format in dict(Booking.FORMAT_CHOICES) else Booking.FORMAT_ONLINE,
+                number_of_sessions=1,
+                total_price=service.price_per_hour,
+                meet_link='',
+                status_changed_by=request.user,
+                status_changed_at=timezone.now(),
+            )
+        return booking
+
+
+class BookingReasonSerializer(serializers.Serializer):
+    reason = serializers.CharField(required=False, allow_blank=True, max_length=1000)

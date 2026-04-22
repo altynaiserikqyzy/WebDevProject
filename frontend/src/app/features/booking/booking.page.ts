@@ -34,7 +34,7 @@ import { PlatformService } from '../../core/platform.service';
 })
 export class BookingPage {
   readonly success = signal(false);
-  subject = 'Calculus';
+  subject = 'Statistics';
   date = '2026-04-21';
   time = '19:00';
   format: 'online' | 'offline' = 'online';
@@ -52,7 +52,6 @@ export class BookingPage {
       format: this.format,
       sessionsCount: this.safeSessionsCount(),
       totalPrice: this.safeSessionsCount() * 7000,
-      eventColor: '#8b5cf6',
       meetLink: this.format === 'online' ? 'https://meet.google.com/new-kbtu-session' : undefined
     });
     this.success.set(true);

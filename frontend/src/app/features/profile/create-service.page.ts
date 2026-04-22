@@ -258,7 +258,7 @@ export class CreateServicePage {
         });
         this.slotForm.reset({ date: '', start_time: '', end_time: '', format: '' });
         this.slots = [];
-        setTimeout(() => this.router.navigateByUrl('/profile'), 500);
+        setTimeout(() => this.router.navigateByUrl('/tutors'), 500);
       },
       error: (err) => {
         this.isPublishing = false;

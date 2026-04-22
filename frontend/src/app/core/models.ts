@@ -1,5 +1,6 @@
 export type LessonFormat = 'online' | 'offline' | 'both';
-export type BookingStatus = 'confirmed' | 'pending' | 'completed' | 'cancelled';
+export type BookingStatus = 'pending' | 'confirmed' | 'rejected' | 'cancelled' | 'completed' | 'no_show';
+export type BookingAction = 'confirm' | 'reject' | 'cancel' | 'complete' | 'no_show';
 
 export interface User {
   id: number;
@@ -72,16 +73,39 @@ export interface TutorProfile {
 
 export interface Booking {
   id: number;
-  tutorId: number;
-  subjectName: string;
-  date: string;
-  time: string;
-  format: Exclude<LessonFormat, 'both'>;
-  sessionsCount: number;
-  totalPrice: number;
   status: BookingStatus;
-  eventColor: string;
-  meetLink?: string;
+  student_name: string;
+  teacher_name: string;
+  subject_name: string;
+  service_title: string;
+  scheduled_start_at: string;
+  scheduled_end_at: string;
+  format: LessonFormat;
+  number_of_sessions: number;
+  total_price: string | null;
+  meet_link?: string;
+  cancel_reason?: string;
+  rejection_reason?: string;
+  no_show_marked_at?: string | null;
+  completed_at?: string | null;
+  cancellation_deadline_at?: string | null;
+  allowed_actions: BookingAction[];
+  can_payment_be_initiated: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BookingCreatePayload {
+  service_id: number;
+  slot_id: number;
+}
+
+export interface BookingReasonPayload {
+  reason?: string;
+}
+
+export interface BookingActionResponse extends Booking {
+  status: BookingStatus;
 }
 
 export interface LoginRequest {

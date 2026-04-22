@@ -1,9 +1,8 @@
 import { Component, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { finalize, timeout } from 'rxjs';
+import { catchError, finalize, forkJoin, map, of, timeout } from 'rxjs';
 
 import { ApiService } from '../../core/api.service';
-import { PlatformService } from '../../core/platform.service';
 
 type SlotFormat = 'online' | 'offline' | 'both';
 
@@ -130,15 +129,15 @@ interface TutorViewModel {
                 <button
                   type="button"
                   class="flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition"
-                  [class]="slot.id === selectedSlotId() ? 'border-brand-300 bg-brand-500/10' : 'border-white/10 bg-slate-900/70 hover:bg-slate-800'"
-                  (click)="selectSlot(slot.id)"
+                  [class]="isSlotSelected(slot.id) ? 'border-brand-300 bg-brand-500/10' : 'border-white/10 bg-slate-900/70 hover:bg-slate-800'"
+                  (click)="toggleSlot(slot.id)"
                 >
                   <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                     <span class="font-semibold">{{ prettyDate(slot.date) }}</span>
                     <span class="text-slate-300">{{ slot.start_time }} - {{ slot.end_time }}</span>
                     <span class="text-brand-200">{{ formatLabel(slot.format) }}</span>
                   </div>
-                  <span class="h-4 w-4 rounded-full border border-white/30" [class.bg-brand-500]="slot.id === selectedSlotId()"></span>
+                  <span class="h-4 w-4 rounded-full border border-white/30" [class.bg-brand-500]="isSlotSelected(slot.id)"></span>
                 </button>
               } @empty {
                 <article class="rounded-xl border border-dashed border-white/10 px-4 py-6 text-sm text-slate-400">
@@ -151,14 +150,20 @@ interface TutorViewModel {
 
         <aside class="glass h-fit space-y-4 p-6">
           <h2 class="text-2xl font-semibold">Book session</h2>
-          <p class="text-sm text-slate-300">Choose a slot from the tutor list.</p>
+          <p class="text-sm text-slate-300">Choose one or more slots from the tutor list.</p>
 
-          @if (selectedSlot(); as slot) {
+          @if (selectedSlots().length) {
             <article class="rounded-xl border border-white/15 bg-slate-900/70 p-4 text-sm">
-              <p class="font-semibold text-brand-100">Selected slot</p>
-              <p class="mt-2">{{ prettyDate(slot.date) }}</p>
-              <p class="mt-1">{{ slot.start_time }} - {{ slot.end_time }}</p>
-              <p class="mt-1">{{ formatLabel(slot.format) }}</p>
+              <p class="font-semibold text-brand-100">Selected slots ({{ selectedSlots().length }})</p>
+              <div class="mt-2 space-y-2">
+                @for (slot of selectedSlots(); track slot.id) {
+                  <div class="rounded-lg border border-white/10 bg-slate-800/70 px-3 py-2">
+                    <p>{{ prettyDate(slot.date) }}</p>
+                    <p class="mt-1">{{ slot.start_time }} - {{ slot.end_time }}</p>
+                    <p class="mt-1">{{ formatLabel(slot.format) }}</p>
+                  </div>
+                }
+              </div>
               <div class="mt-3 border-t border-white/10 pt-3">
                 <p>Subject: <span class="text-brand-100">{{ selectedService()?.subject }}</span></p>
                 <p class="mt-1">Total: <span class="text-brand-100">{{ totalPrice() }} KZT</span></p>
@@ -170,7 +175,10 @@ interface TutorViewModel {
             </article>
           }
 
-          <button class="btn-primary w-full" [disabled]="!selectedSlot() || !selectedService()" (click)="bookSelectedSlot()">Book selected slot</button>
+          <button class="btn-primary w-full" [disabled]="!selectedSlots().length || !selectedService()" (click)="bookSelectedSlots()">Book selected slots</button>
+          @if (bookingActionError()) {
+            <p class="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{{ bookingActionError() }}</p>
+          }
           <a href="https://t.me/" target="_blank" rel="noopener noreferrer" class="btn-secondary inline-flex w-full justify-center">Contact via Telegram</a>
         </aside>
       </section>
@@ -181,14 +189,15 @@ export class TutorDetailPage {
   readonly tutor = signal<TutorViewModel | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
+  readonly bookingSubmitting = signal(false);
+  readonly bookingActionError = signal('');
 
   readonly selectedServiceId = signal<number | null>(null);
-  readonly selectedSlotId = signal<number | null>(null);
+  readonly selectedSlotIds = signal<number[]>([]);
 
   constructor(
     private readonly route: ActivatedRoute,
     private readonly api: ApiService,
-    private readonly platform: PlatformService,
     private readonly router: Router
   ) {
     const tutorId = Number(this.route.snapshot.paramMap.get('id'));
@@ -207,7 +216,7 @@ export class TutorDetailPage {
         this.tutor.set(tutor);
         const firstService = tutor.services[0];
         this.selectedServiceId.set(firstService?.id ?? null);
-        this.selectedSlotId.set(firstService?.slots[0]?.id ?? null);
+        this.selectedSlotIds.set([]);
       },
       error: (err) => {
         this.error.set(err?.error?.detail || 'This tutor profile could not be loaded.');
@@ -228,50 +237,82 @@ export class TutorDetailPage {
     return (this.selectedService()?.slots ?? []).filter((slot) => !slot.is_booked);
   }
 
-  selectedSlot() {
-    const slotId = this.selectedSlotId();
-    if (!slotId) {
-      return null;
+  selectedSlots() {
+    const selectedIds = this.selectedSlotIds();
+    if (!selectedIds.length) {
+      return [];
     }
-    return this.serviceSlots().find((slot) => slot.id === slotId) ?? null;
+    const selectedIdSet = new Set(selectedIds);
+    return this.serviceSlots().filter((slot) => selectedIdSet.has(slot.id));
   }
 
   selectService(serviceId: number) {
     this.selectedServiceId.set(serviceId);
-    const firstSlot = this.serviceSlots()[0];
-    this.selectedSlotId.set(firstSlot?.id ?? null);
+    this.selectedSlotIds.set([]);
+    this.bookingActionError.set('');
   }
 
-  selectSlot(slotId: number) {
-    this.selectedSlotId.set(slotId);
+  isSlotSelected(slotId: number) {
+    return this.selectedSlotIds().includes(slotId);
+  }
+
+  toggleSlot(slotId: number) {
+    this.bookingActionError.set('');
+    if (this.isSlotSelected(slotId)) {
+      this.selectedSlotIds.update((ids) => ids.filter((id) => id !== slotId));
+      return;
+    }
+    this.selectedSlotIds.update((ids) => [...ids, slotId]);
   }
 
   totalPrice() {
-    return Number(this.selectedService()?.price ?? 0) || 0;
+    const price = Number(this.selectedService()?.price ?? 0) || 0;
+    return price * this.selectedSlots().length;
   }
 
-  bookSelectedSlot() {
-    const tutor = this.tutor();
-    const service = this.selectedService();
-    const slot = this.selectedSlot();
-    if (!tutor || !service || !slot) {
+  bookSelectedSlots() {
+    if (this.bookingSubmitting()) {
       return;
     }
 
-    const format = slot.format === 'offline' ? 'offline' : 'online';
-    this.platform.addBooking({
-      tutorId: tutor.userId,
-      subjectName: service.subject,
-      date: slot.date,
-      time: `${slot.start_time}-${slot.end_time}`,
-      format,
-      sessionsCount: 1,
-      totalPrice: this.totalPrice(),
-      eventColor: '#8b5cf6',
-      meetLink: format === 'online' ? this.generateMeetLink(tutor.id, service.id, slot.id) : undefined,
-    });
+    const tutor = this.tutor();
+    const service = this.selectedService();
+    const slots = this.selectedSlots();
+    if (!tutor || !service || !slots.length) {
+      return;
+    }
 
-    this.router.navigateByUrl('/calendar');
+    this.bookingSubmitting.set(true);
+    this.bookingActionError.set('');
+
+    const createCalls = slots.map((slot) =>
+      this.api.createBooking({
+        service_id: service.id,
+        slot_id: slot.id,
+      }).pipe(
+        map((booking) => ({ ok: true as const, booking, slotId: slot.id })),
+        catchError((err) => of({
+          ok: false as const,
+          error: this.extractErrorMessage(err, 'Failed to create booking.'),
+          slotId: slot.id,
+        }))
+      )
+    );
+
+    forkJoin(createCalls)
+      .pipe(finalize(() => this.bookingSubmitting.set(false)))
+      .subscribe({
+        next: (results) => {
+          const successCount = results.filter((r) => r.ok).length;
+          if (successCount > 0) {
+            this.router.navigateByUrl('/calendar');
+            return;
+          }
+
+          const firstFailure = results.find((r) => !r.ok);
+          this.bookingActionError.set(firstFailure?.error || 'Failed to create booking.');
+        },
+      });
   }
 
   formatLabel(format: SlotFormat) {
@@ -346,5 +387,37 @@ export class TutorDetailPage {
 
   private generateMeetLink(tutorId: number, serviceId: number, slotId: number) {
     return `https://meet.google.com/kbtu-${tutorId}-${serviceId}-${slotId}`;
+  }
+
+  private extractErrorMessage(err: any, fallback: string) {
+    const detail = err?.error?.detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+    if (Array.isArray(detail) && detail.length) {
+      return String(detail[0]);
+    }
+    if (detail && typeof detail === 'object') {
+      const first = Object.values(detail)[0];
+      if (Array.isArray(first) && first.length) {
+        return String(first[0]);
+      }
+      if (typeof first === 'string') {
+        return first;
+      }
+    }
+
+    const errorBody = err?.error;
+    if (errorBody && typeof errorBody === 'object') {
+      const firstValue = Object.values(errorBody)[0];
+      if (Array.isArray(firstValue) && firstValue.length) {
+        return String(firstValue[0]);
+      }
+      if (typeof firstValue === 'string' && firstValue.trim()) {
+        return firstValue;
+      }
+    }
+
+    return fallback;
   }
 }
